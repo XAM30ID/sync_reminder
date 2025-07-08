@@ -10,7 +10,7 @@ from django.conf import settings
 from telebot.apihelper import ApiTelegramException
 from telebot.types import Update
 
-from bot import bot, logger
+from bot import bot, logger, SettingsStates
 from bot.handlers.reminder import *
 from bot.handlers.menu import *
 
@@ -49,6 +49,10 @@ def index(request: HttpRequest) -> JsonResponse:
     return JsonResponse({"message": "OK"}, status=200)
 
 
+@bot.message_handler(state=SettingsStates.timezone.name)
+def m_final_sets(message: Message):
+    final_sets(message, bot)
+
 @bot.message_handler(commands=['start'])
 def m_cmd_start(message: Message):
     print(Reminder.objects.filter(is_pre_reminder_sent=False))
@@ -56,6 +60,15 @@ def m_cmd_start(message: Message):
         cmd_start(message=message, bot=bot)
     except Exception as e:
         print(e)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('o'))
+def m_selected_addressing(call: CallbackQuery):
+    selected_addressing(call, bot)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('f'))
+def m_selected_tone(call: CallbackQuery):
+    selected_tone(call, bot)
+
 
 @bot.message_handler(func=lambda message: message.text == '📝 Напоминание')
 def m_reminder_button(message: Message):
@@ -83,7 +96,13 @@ def m_handle_voice(message: Message):
 
 @bot.message_handler(content_types=['text'])
 def m_handle_text(message: Message):
-    try:
-        handle_text(message=message, bot=bot)
-    except Exception as e:
-        print(e)
+    if bot.get_state(message.from_user.id) == SettingsStates.timezone.name:
+        try:
+            final_sets(message, bot)
+        except Exception as e:
+            print(e)
+    else:
+        try:
+            handle_text(message=message, bot=bot)
+        except Exception as e:
+            print(e)

@@ -7,11 +7,11 @@ from bot import bot
 from ..models import Reminder
 
 def send_reminders():
-    pre_reminders = Reminder.objects.filter(reminder_time__lte=datetime.datetime.now(), is_pre_reminder_sent=False) | \
-                    Reminder.objects.filter(~Q(repeat_type=None), ~Q(repeat_time=None), repeat_time__gte=datetime.datetime.now() - datetime.timedelta(minutes=15), is_pre_reminder_sent=False)
+    pre_reminders = Reminder.objects.filter(reminder_time__gte=datetime.datetime.now(), is_pre_reminder_sent=False) | \
+                    Reminder.objects.filter(~Q(repeat_type=None), ~Q(repeat_time=None), repeat_time__lte=datetime.datetime.now() - datetime.timedelta(minutes=15), is_pre_reminder_sent=False)
     
     reminders = Reminder.objects.filter(reminder_time__lte=datetime.datetime.now(), is_main_reminder_sent=False) | \
-                    Reminder.objects.filter(~Q(repeat_type=None), ~Q(repeat_time=None), repeat_time__gte=datetime.datetime.now(), is_main_reminder_sent=False)
+                    Reminder.objects.filter(~Q(repeat_type=None), ~Q(repeat_time=None), repeat_time__lte=datetime.datetime.now(), is_main_reminder_sent=False)
     try:
         with open('all_reminders.txt', 'a', encoding='utf-8') as f:
             f.write('ПРЕДВАРИТЕЛЬНЫЕ НАПОМИНАНИЯ')
@@ -25,13 +25,13 @@ def send_reminders():
                     repeat_info = " 🔄"
 
             bot.send_message(
-                chat_id=pre_reminder.user_id,
+                chat_id=pre_reminder.user.user_id,
                 text=f"⏰ Предварительное напоминание (через 15 минут)!{repeat_info}\n"
                 f"📝 {pre_reminder.text}"
             )
             with open('all_reminders.txt', 'a', encoding='utf-8') as f:
                 f.write('\nПредварительное напоминание: ' + str(pre_reminder.text) + str(pre_reminder.repeat_type))
-                f.write('\nПользователь: ' + str(pre_reminder.user_id))
+                f.write('\nПользователь: ' + str(pre_reminder.user.user_id))
 
             pre_reminder.is_pre_reminder_sent = True
             pre_reminder.save()
@@ -45,7 +45,7 @@ def send_reminders():
                     repeat_info = " 🔄 (повторится через неделю)"
             
             bot.send_message(
-                chat_id=reminder.user_id,
+                chat_id=reminder.user.user_id,
                 text=f"🔔 Время пришло!{repeat_info}\n"
                 f"📝 {reminder.text}"
             )

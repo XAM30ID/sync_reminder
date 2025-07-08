@@ -1,4 +1,5 @@
 import os
+import pytz
 
 from django.db import models
 from django.core.files.storage import FileSystemStorage
@@ -8,18 +9,34 @@ from main.settings import BASE_DIR
 
 fs = FileSystemStorage(location=f"{BASE_DIR}/media")
 
+class UserProfile(models.Model):
+    '''
+        Модель для хранения информации о пользователе
+    '''
+    user_id = models.IntegerField(verbose_name='ID пользователя в Telegram', primary_key=True)
+    username = models.TextField(verbose_name='Ник пользователя в Telegram', blank=True)
+    addressing = models.CharField(verbose_name='Обращение', choices={'ty': 'Ты', 'vy': 'Вы'})
+    tone = models.CharField(verbose_name='Тон общения', choices={'business': 'Деловой', 'friendly': 'Дружелюбный', 'neutral': 'Нейтральный'})
+    timezone = models.CharField(verbose_name='Часовой пояс', default='+3', help_text='Разница с UTC в формате "±0"')
+
+    def __str__(self):
+        return f'Пользователь {self.username}'
+    
+    class Meta:
+        verbose_name = 'Пользователь'
+        verbose_name_plural = 'Пользователи'
+
+
 class Reminder(models.Model):
     '''
         Модель напоминания
     '''
     REPEAT_TYPES = {
-        'daily_morning': 'Каждое утро',
-        'daily_evening': 'Каждый вечер',
         'daily': 'Каждый день',
         'weekly': 'Каждую неделю',
     }
     
-    user_id = models.IntegerField(verbose_name='Id пользователя')
+    user = models.ForeignKey(to=UserProfile, verbose_name='Пользователь', on_delete=models.CASCADE)
     text = models.TextField(verbose_name='Текст напоминания')
     reminder_time = models.DateTimeField(verbose_name='Дата и время напоминания')
     pre_reminder_time = models.DateTimeField(verbose_name='Дата и время напоминания заранее')
@@ -30,7 +47,7 @@ class Reminder(models.Model):
     repeat_time = models.DateTimeField(verbose_name='Дата и время повторения', null=True, blank=True)
 
     def __str__(self):
-        return f'Напоминание пользователя {self.user_id}'
+        return f'Напоминание пользователя {self.user.username} {self.text}'
     
     class Meta:
         verbose_name = 'Напоминание'
@@ -48,7 +65,7 @@ class Task(models.Model):
         'weekly': 'Каждую неделю',
     }
     
-    user_id = models.IntegerField(verbose_name='Id пользователя')
+    user = models.ForeignKey(to=UserProfile, verbose_name='Пользователь', on_delete=models.CASCADE)
     text = models.TextField(verbose_name='Текст задачи')
     reminder_time = models.DateTimeField(verbose_name='Дата и время напоминания')
     pre_reminder_time = models.DateTimeField(verbose_name='Дата и время напоминания заранее')
@@ -87,4 +104,4 @@ class GeneralInfo(models.Model):
     class Meta:
         verbose_name = 'Общая информация'
         verbose_name_plural = 'Общая информация'
-    
+

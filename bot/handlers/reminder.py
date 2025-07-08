@@ -1,17 +1,20 @@
 import os
 import re
+import time
 from datetime import datetime, timedelta
 
 from telebot.apihelper import ApiTelegramException
 from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery, Message, InputMediaPhoto, User
 from telebot import TeleBot
 
+from django.utils import timezone
+
 from config import AI_MODEL
 from .ai import OpenAIAPI
 from ..services.parser import parse_reminder_time, parse_date_query
 from ..services.voice import convert_ogg_to_wav, transcribe_audio
 from ..utils.timezone import format_moscow_time
-from ..models import Reminder, Task
+from ..models import Reminder, Task, UserProfile
 
 from bot import bot, logger
 
@@ -64,7 +67,6 @@ def list_reminders(message: Message, bot: TeleBot):
     one_time_reminders = reminders.filter(repeat_type=None)
     recurring_reminders = reminders.exclude(repeat_type=None)
     
-    current_time = datetime.now()
     
     # Формируем красивое сообщение
     message_parts = ["📋 **Ваши напоминания:**\n"]
@@ -74,7 +76,10 @@ def list_reminders(message: Message, bot: TeleBot):
         message_parts.append("📅 **Разовые напоминания:**")
         for i, reminder in enumerate(one_time_reminders, 1):
             # Убираем информацию о часовом поясе
-            reminder_time = reminder.reminder_time.replace(tzinfo=None)
+            offset = timedelta(hours=int(reminder.user.timezone[1:]))
+            custom_tz = timezone.get_fixed_timezone(offset)
+            reminder_time = reminder.reminder_time.astimezone(custom_tz)
+            current_time = datetime.now(custom_tz)
             
             # Определяем статус
             if reminder_time > current_time:
@@ -145,7 +150,9 @@ def handle_voice(message: Message, bot: TeleBot):
         # Скачиваем голосовое сообщение
         file = bot.get_file(message.voice.file_id)
         file_path = f"voice_{message.from_user.id}_{message.message_id}.ogg"
-        bot.download_file(file.file_path, file_path)
+        downloaded = bot.download_file(file.file_path)
+        with open(file_path, 'wb') as f:
+            f.write(downloaded)
         
         # Распознаем текст
         text = transcribe_audio(file_path)
@@ -154,12 +161,21 @@ def handle_voice(message: Message, bot: TeleBot):
             bot.send_message(chat_id=message.chat.id, text="Извините, не удалось распознать голосовое сообщение. Попробуйте еще раз.")
             return
         
+        addressing = None
+        tone = None
+        user_info = UserProfile.objects.get(user_id=message.from_user.id)
+        if user_info.pk:
+            utc_info = user_info.timezone
+            addressing = user_info.addressing
+            tone = user_info.tone
         # Получаем ответ от ИИ
         ai_response = AI.get_response(
             chat_id=message.from_user.id, 
             text=text, 
             model=AI_MODEL, 
-            max_token=3000
+            max_token=3000,
+            tone=tone,
+            addressing=addressing
         )
         
         if not ai_response or not ai_response.get('message'):
@@ -171,10 +187,10 @@ def handle_voice(message: Message, bot: TeleBot):
         
         if parsed_response['type'] == 'reminder':
             # ИИ определила, что нужно создать напоминание
-            create_reminder_from_ai(message, parsed_response)
+            create_reminder_from_ai(message, parsed_response, bot)
         elif parsed_response['type'] == 'delete':
             # ИИ определила, что нужно удалить напоминание
-            handle_delete_reminder_from_ai(message, parsed_response)
+            handle_delete_reminder_from_ai(message, parsed_response, bot)
         else:
             # Обычное общение
             bot.send_message(chat_id=message.chat.id, text=parsed_response['message'])
@@ -256,21 +272,28 @@ def handle_text(message: Message, bot: TeleBot):
     
     bot.send_chat_action(chat_id=message.chat.id, action="typing")
     
+    addressing = None
+    tone = None
+    user_info = UserProfile.objects.get(user_id=message.from_user.id)
+    if user_info.pk:
+        addressing = user_info.addressing
+        tone = user_info.tone
     # Получаем ответ от ИИ
     ai_response = AI.get_response(
         chat_id=message.from_user.id, 
         text=message.text, 
         model=AI_MODEL, 
-        max_token=1000
+        max_token=3000,
+        tone=tone,
+        addressing=addressing
     )
     
     if not ai_response or not ai_response.get('message'):
         bot.send_message(chat_id=message.chat_id, text="Извините, произошла ошибка при обработке сообщения.")
         return
     
-    # Парсим ответ ИИ
+    # Парсим ответ ИИ   
     parsed_response = AI.parse_ai_response(ai_response['message'])
-    
     if parsed_response['type'] == 'reminder':
         # ИИ определила, что нужно создать напоминание
         create_reminder_from_ai(message, parsed_response, bot)
@@ -350,25 +373,33 @@ def create_reminder_from_ai(message: Message, ai_data: dict, bot: TeleBot):
         print(f"final_reminder_text: '{final_reminder_text}'")
         print(f"reminder_time: {reminder_time}")
         print("=======================")
-        
+        user = UserProfile.objects.get(user_id=message.from_user.id)
+        if user.pk:
+            utc_offset = int(user.timezone[1:])
+        else:
+            utc_offset = 3
+        offset = timedelta(hours=utc_offset)
+        custom_timezone = timezone.get_fixed_timezone(offset=offset)
+        aware_reminder_time = timezone.make_aware(reminder_time, timezone=custom_timezone)
+        aware_pre_reminder_time = timezone.make_aware(pre_reminder_time, timezone=custom_timezone)
         # Добавляем напоминание в базу, используя короткое название от ИИ
         repeat_time=None
         if repeat_type == 'daily':
-            repeat_time = reminder_time + timedelta(days=1)
+            repeat_time = aware_reminder_time + timedelta(days=1)
         elif repeat_type == 'weekly':
-            repeat_time = reminder_time + timedelta(weeks=1)
+            repeat_time = aware_reminder_time + timedelta(weeks=1)
+        
         Reminder.objects.create(
             user_id=message.from_user.id,
             text=final_reminder_text,
-            reminder_time=reminder_time,
-            pre_reminder_time=pre_reminder_time,
+            reminder_time=aware_reminder_time,
+            pre_reminder_time=aware_pre_reminder_time,
             is_pre_reminder_sent=False,
             is_main_reminder_sent=False,
             created_at=datetime.now(),
             repeat_type=repeat_type,
             repeat_time=repeat_time
         )
-        # await add_reminder(message.from_user.id, final_reminder_text, reminder_time, pre_reminder_time, repeat_type)
         
         # Формируем сообщение о создании напоминания
         repeat_info = ""

@@ -2,6 +2,8 @@ import os
 import speech_recognition as sr
 from pydub import AudioSegment
 
+from main.settings import BASE_DIR
+
 def convert_ogg_to_wav(ogg_path: str) -> str:
     """Конвертация .ogg файла в .wav для распознавания"""
     wav_path = ogg_path.replace('.ogg', '.wav')
@@ -14,7 +16,7 @@ def transcribe_audio(file_path: str) -> str:
     try:
         # Конвертируем в WAV для speech_recognition
         wav_path = convert_ogg_to_wav(file_path)
-        
+        print(wav_path)
         # Инициализируем распознаватель
         recognizer = sr.Recognizer()
         

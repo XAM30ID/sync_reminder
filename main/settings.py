@@ -34,7 +34,7 @@ ALLOWED_HOSTS = ['*']
 
 # Настройки бота
 BOT_TOKEN = os.getenv('BOT_TOKEN')
-HOOK = 'https://9upi1l-176-52-15-111.ru.tuna.am'
+HOOK = 'https://vqd110-176-52-123-58.ru.tuna.am'
 OWNER_ID = os.getenv('OWNER_ID')
 BOT_NAME = 'Тоби'
 BOT_COMMANDS = [

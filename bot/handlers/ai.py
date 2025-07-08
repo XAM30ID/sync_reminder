@@ -133,40 +133,41 @@ class BaseAIAPI:
         Возвращает словарь с типом ответа и данными
         """
         response_text = response_text.strip()
-        
         # ОТЛАДКА: выводим сырой ответ ИИ
         print(f"=== СЫРОЙ ОТВЕТ ИИ ===")
-        print(f"'{response_text[response_text.index('{'):response_text.index('}') + 1]}'")
+        if '{' in response_text:
+            print(f"'{response_text[response_text.index('{'):response_text.index('}') + 1]}'")
+        else:
+            print(f"'{response_text}'")
         print("====================")
 
         # Пытаемся распарсить как JSON
-        if response_text.startswith('{') and response_text.endswith('}'):
-            try:
-                parsed_json = json.loads(response_text)
-                if parsed_json.get('type') == 'reminder':
-                    result = {
-                        'type': 'reminder',
-                        'reminder_text': parsed_json.get('text', ''),
-                        'time_text': parsed_json.get('time', '')
-                    }
-                    # ОТЛАДКА: выводим распарсенный результат
-                    print(f"=== РАСПАРСЕННЫЙ JSON (REMINDER) ===")
-                    print(f"text: '{result['reminder_text']}'")
-                    print(f"time: '{result['time_text']}'")
-                    print("===================================")
-                    return result
-                elif parsed_json.get('type') == 'delete':
-                    result = {
-                        'type': 'delete',
-                        'search_text': parsed_json.get('text', '')
-                    }
-                    # ОТЛАДКА: выводим распарсенный результат
-                    print(f"=== РАСПАРСЕННЫЙ JSON (DELETE) ===")
-                    print(f"search_text: '{result['search_text']}'")
-                    print("==================================")
-                    return result
-            except json.JSONDecodeError:
-                pass
+        try:
+            parsed_json = json.loads(response_text)
+            if parsed_json.get('type') == 'reminder':
+                result = {
+                    'type': 'reminder',
+                    'reminder_text': parsed_json.get('text', ''),
+                    'time_text': parsed_json.get('time', '')
+                }
+                # ОТЛАДКА: выводим распарсенный результат
+                print(f"=== РАСПАРСЕННЫЙ JSON (REMINDER) ===")
+                print(f"text: '{result['reminder_text']}'")
+                print(f"time: '{result['time_text']}'")
+                print("===================================")
+                return result
+            elif parsed_json.get('type') == 'delete':
+                result = {
+                    'type': 'delete',
+                    'search_text': parsed_json.get('text', '')
+                }
+                # ОТЛАДКА: выводим распарсенный результат
+                print(f"=== РАСПАРСЕННЫЙ JSON (DELETE) ===")
+                print(f"search_text: '{result['search_text']}'")
+                print("==================================")
+                return result
+        except json.JSONDecodeError as e:
+            pass
         
         # Если не JSON или не напоминание/удаление, возвращаем как обычный ответ
         return {
@@ -181,20 +182,30 @@ class OpenAIAPI(BaseAIAPI):
     def __init__(self, ) -> None:
         super().__init__()
 
-    def _get_or_create_user_chat_history(self, chat_id: int, new_user_message: str = "") -> list:
+    def _get_or_create_user_chat_history(self, chat_id: int, new_user_message: str = "",
+                                         tone=None, addressing=None) -> list:
+        
+        sets_text = ''
+        if not tone is None:
+            sets_text += f'ОБЯЗАТЕЛЬНО ВЕДИ ДИАЛОГ В СЛЕДУЮЩЕМ СТИЛЕ: {tone}\n\n'
+        if not addressing is None:
+            sets_text += f'ОБРАЩАЙСЯ ТОЛЬКО НА {addressing}'
+
         if not self.chat_history.get(chat_id, False):
             self.chat_history[chat_id] = []
             # Добавляем системный промпт с текущей датой и временем
-            system_prompt = self._ASSISTANT_PROMPT + "\n\n" + get_current_datetime_info()
+            system_prompt = self._ASSISTANT_PROMPT + "\n\n" + sets_text
             self.chat_history[chat_id].append({"role": "system", "content": system_prompt})
             self.chat_history[chat_id].append({"role": "user", "content": new_user_message})
             return self.chat_history[chat_id]
-
+        if sets_text != '':
+            self.chat_history[chat_id].append({"role": "system", "content": sets_text})
         self.chat_history[chat_id].append({"role": "user", "content": new_user_message})
         chat_history = self.chat_history[chat_id]
         return chat_history
 
-    def get_response(self, chat_id: int, text: str, model: str, max_token: int =1024) -> dict:
+    def get_response(self, chat_id: int, text: str, model: str, max_token: int =1024,
+            tone=None, addressing=None) -> dict:
         """
         Make request to AI and write answer to message_history.
         Usually working in chats with AI.
@@ -204,7 +215,7 @@ class OpenAIAPI(BaseAIAPI):
         print(f"'{text}'")
         print("=============================")
         
-        user_chat_history = self._get_or_create_user_chat_history(chat_id, text)
+        user_chat_history = self._get_or_create_user_chat_history(chat_id, text, tone, addressing)
 
         try:
             response = (
