@@ -47,7 +47,7 @@ class Reminder(models.Model):
     repeat_time = models.DateTimeField(verbose_name='Дата и время повторения', null=True, blank=True)
 
     def __str__(self):
-        return f'Напоминание пользователя {self.user.username} {self.text}'
+        return f'Напоминание пользователя от {self.reminder_time} {self.user.username} {self.text}'
     
     class Meta:
         verbose_name = 'Напоминание'

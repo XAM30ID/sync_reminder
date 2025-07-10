@@ -7,7 +7,6 @@ from telebot.apihelper import ApiTelegramException
 from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery, Message, InputMediaPhoto, User
 from telebot import TeleBot
 
-from django.utils import timezone
 
 from config import AI_MODEL
 from .ai import OpenAIAPI
@@ -16,6 +15,7 @@ from ..services.voice import convert_ogg_to_wav, transcribe_audio
 from ..utils.timezone import format_moscow_time
 from ..models import Reminder, Task, UserProfile
 
+from django.utils import timezone
 from bot import bot, logger
 
 AI = OpenAIAPI()
@@ -212,10 +212,9 @@ def handle_text(message: Message, bot: TeleBot):
     # Проверяем, есть ли у пользователя сохраненный контекст удаления
     if user_id in user_delete_context:
         context = user_delete_context[user_id]
-        
         if user_text in ['удали все', 'удалить все']:
             # Удаляем все найденные напоминания
-            reminder_ids = [r['id'] for r in context['reminders']]
+            reminder_ids = [r.id for r in context['reminders']]
             Reminder.objects.filter(id__in=reminder_ids).delete()
             
             # Очищаем контекст
@@ -230,7 +229,7 @@ def handle_text(message: Message, bot: TeleBot):
         elif user_text in ['удали первое', 'удалить первое', 'первое']:
             # Удаляем первое напоминание из списка
             first_reminder = context['reminders'][0]
-            Reminder.objects.get(id=first_reminder['id']).delete()
+            Reminder.objects.get(id=first_reminder.id).delete()
             
             # Очищаем контекст
             del user_delete_context[user_id]
@@ -253,7 +252,7 @@ def handle_text(message: Message, bot: TeleBot):
             try:
                 index = int(user_text[6:]) - 1  # -1 потому что нумерация с 1
                 if 0 <= index < len(context['reminders']):
-                    reminder_to_delete = context['reminders'][index]['id']
+                    reminder_to_delete = context['reminders'][index].id
                     Reminder.objects.get(id=reminder_to_delete).delete()
                     # Очищаем контекст
                     del user_delete_context[user_id]
@@ -299,7 +298,7 @@ def handle_text(message: Message, bot: TeleBot):
         create_reminder_from_ai(message, parsed_response, bot)
     elif parsed_response['type'] == 'delete':
         # ИИ определила, что нужно удалить напоминание
-        handle_delete_reminder_from_ai(message, parsed_response)
+        handle_delete_reminder_from_ai(message, parsed_response, bot)
     else:
         # Обычное общение
         bot.send_message(chat_id=message.chat.id, text=parsed_response['message'])
@@ -382,6 +381,8 @@ def create_reminder_from_ai(message: Message, ai_data: dict, bot: TeleBot):
         custom_timezone = timezone.get_fixed_timezone(offset=offset)
         aware_reminder_time = timezone.make_aware(reminder_time, timezone=custom_timezone)
         aware_pre_reminder_time = timezone.make_aware(pre_reminder_time, timezone=custom_timezone)
+        created_time = timezone.make_aware(datetime.now(), timezone=custom_timezone)
+        print(aware_reminder_time)
         # Добавляем напоминание в базу, используя короткое название от ИИ
         repeat_time=None
         if repeat_type == 'daily':
@@ -396,7 +397,7 @@ def create_reminder_from_ai(message: Message, ai_data: dict, bot: TeleBot):
             pre_reminder_time=aware_pre_reminder_time,
             is_pre_reminder_sent=False,
             is_main_reminder_sent=False,
-            created_at=datetime.now(),
+            created_at=created_time,
             repeat_type=repeat_type,
             repeat_time=repeat_time
         )
@@ -429,7 +430,7 @@ def handle_delete_reminder_from_ai(message: Message, ai_data: dict, bot: TeleBot
     Обрабатывает удаление напоминаний на основе данных от ИИ
     """
     try:
-        search_text = ai_data.get('search_text', '').strip()
+        search_text = ai_data.get('search_text', '').strip().lower()
         
         print(f"=== ОТЛАДКА УДАЛЕНИЯ ===")
         print(f"search_text: '{search_text}'")
@@ -440,17 +441,37 @@ def handle_delete_reminder_from_ai(message: Message, ai_data: dict, bot: TeleBot
             return False
         
         # Сначала пытаемся найти по дате
-        target_date = parse_date_query(search_text)
+        user = UserProfile.objects.get(user_id=message.from_user.id)
+        if user.pk:
+            custom_delta = int(user.timezone[1:])
+        else:
+            custom_delta = 3
+        target_date = parse_date_query(search_text, delta=custom_delta)
+
         matching_reminders = []
         
         if target_date:
             print(f"Найдена дата: {target_date}")
-            matching_reminders = Reminder.objects.filter(user_id=message.from_user.id, reminder_time=target_date)
-            # matching_reminders = await find_user_reminders_by_date(message.from_user.id, target_date)
+            offset = timedelta(hours=custom_delta)
+            custom_timezone = timezone.get_fixed_timezone(offset=offset)
+            target_date = timezone.make_aware(datetime(
+                year=int(target_date.split('-')[0]),
+                month=int(target_date.split('-')[1]),
+                day=int(target_date.split('-')[2]),
+            ), timezone=custom_timezone)
+
+            all_reminders = Reminder.objects.filter(user_id=message.from_user.id)
+            for reminder in all_reminders:
+                print(reminder.reminder_time.astimezone(tz=custom_timezone).date(), target_date.date())
+                if reminder.reminder_time.astimezone(tz=custom_timezone).date() == target_date.date():
+                    matching_reminders.append(reminder)
         
         # Если по дате не найдено или дата не определена, ищем по тексту
         if not matching_reminders:
-            matching_reminders = Reminder.objects.filter(user_id=message.from_user.id, text=search_text)
+            all_reminders = Reminder.objects.filter(user_id=message.from_user.id)
+            for reminder in all_reminders:
+                if search_text in reminder.text.lower():
+                    matching_reminders.append(reminder)
             # matching_reminders = await find_user_reminders_by_text(message.from_user.id, search_text)
         
         if not matching_reminders:
@@ -463,24 +484,24 @@ def handle_delete_reminder_from_ai(message: Message, ai_data: dict, bot: TeleBot
                 "• Указать более точное описание"
             )
             return False
-        
         if len(matching_reminders) == 1:
             # Если найдено одно напоминание, удаляем его сразу
             reminder = matching_reminders[0]
             
-            reminder_time = datetime.fromisoformat(reminder['reminder_time'])
+            custom_timezone = timezone.get_fixed_timezone(offset=offset)
+            reminder_time = reminder.reminder_time.astimezone(custom_timezone)
             repeat_info = ""
-            if reminder['repeat_type']:
-                if reminder['repeat_type'] == 'daily':
+            if reminder.repeat_type:
+                if reminder.repeat_type == 'daily':
                     repeat_info = " (повторяющееся каждый день)"
-                elif reminder['repeat_type'] == 'weekly':
+                elif reminder.repeat_type == 'weekly':
                     repeat_info = " (повторяющееся каждую неделю)"
             
             bot.send_message(
                 chat_id=message.chat.id, 
                 text=f"✅ Напоминание удалено!\n"
-                f"📝 Текст: {reminder['text']}\n"
-                f"🕐 Время: {format_moscow_time(reminder_time)}{repeat_info}"
+                f"📝 Текст: {reminder.text}\n"
+                f"   🕐 {reminder_time.day}.{reminder_time.month}.{reminder_time.year}\n"
             )
             reminder.delete()
             return True
@@ -501,17 +522,19 @@ def handle_delete_reminder_from_ai(message: Message, ai_data: dict, bot: TeleBot
             ]
             
             for i, reminder in enumerate(matching_reminders, 1):
-                reminder_time = datetime.fromisoformat(reminder['reminder_time'])
+                offset = timedelta(hours=int(reminder.user.timezone[1:]))
+                custom_timezone = timezone.get_fixed_timezone(offset=offset)
+                reminder_time = reminder.reminder_time.astimezone(custom_timezone)
                 repeat_info = ""
-                if reminder['repeat_type']:
-                    if reminder['repeat_type'] == 'daily':
+                if reminder.repeat_type:
+                    if reminder.repeat_type == 'daily':
                         repeat_info = " 🔄"
-                    elif reminder['repeat_type'] == 'weekly':
+                    elif reminder.repeat_type == 'weekly':
                         repeat_info = " 🔄"
                 
                 message_parts.append(
-                    f"{i}. **{reminder['text']}**{repeat_info}\n"
-                    f"   🕐 {format_moscow_time(reminder_time)}\n"
+                    f"{i}. **{reminder.text}**{repeat_info}\n"
+                    f"   🕐 {reminder_time.day}.{reminder_time.month}.{reminder_time.year}\n"
                 )
             
             message_parts.append(
@@ -521,7 +544,6 @@ def handle_delete_reminder_from_ai(message: Message, ai_data: dict, bot: TeleBot
                 "• 'Удали 3' - чтобы удалить напоминание под номером 3\n"
                 "• 'Отмена' - чтобы отменить удаление"
             )
-            
             full_message = "\n".join(message_parts)
             bot.send_message(chat_id=message.chat.id, text=full_message, parse_mode="Markdown")
             return True

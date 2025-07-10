@@ -2,16 +2,17 @@ import datetime
 import logging
 
 from django.db.models import Q
+from django.utils import timezone
 
 from bot import bot
 from ..models import Reminder
 
 def send_reminders():
-    pre_reminders = Reminder.objects.filter(reminder_time__gte=datetime.datetime.now(), is_pre_reminder_sent=False) | \
-                    Reminder.objects.filter(~Q(repeat_type=None), ~Q(repeat_time=None), repeat_time__lte=datetime.datetime.now() - datetime.timedelta(minutes=15), is_pre_reminder_sent=False)
+    pre_reminders = Reminder.objects.filter(reminder_time__gte=timezone.now(), is_pre_reminder_sent=False) | \
+                    Reminder.objects.filter(~Q(repeat_type=None), ~Q(repeat_time=None), repeat_time__lte=timezone.now() - datetime.timedelta(minutes=15), is_pre_reminder_sent=False)
     
-    reminders = Reminder.objects.filter(reminder_time__lte=datetime.datetime.now(), is_main_reminder_sent=False) | \
-                    Reminder.objects.filter(~Q(repeat_type=None), ~Q(repeat_time=None), repeat_time__lte=datetime.datetime.now(), is_main_reminder_sent=False)
+    reminders = Reminder.objects.filter(reminder_time__lte=timezone.now(), is_main_reminder_sent=False) | \
+                    Reminder.objects.filter(~Q(repeat_type=None), ~Q(repeat_time=None), repeat_time__lte=timezone.now(), is_main_reminder_sent=False)
     try:
         with open('all_reminders.txt', 'a', encoding='utf-8') as f:
             f.write('ПРЕДВАРИТЕЛЬНЫЕ НАПОМИНАНИЯ')
@@ -60,17 +61,13 @@ def send_reminders():
     
 
 def clear_reminders():
-    if hasattr(clear_reminders, 'cleanup_counter'):
-        clear_reminders.cleanup_counter += 1
-    else:
-        clear_reminders.cleanup_counter = 1
-        
-    with open('delete_log.txt', 'a', encoding='utf-8') as f:
-        f.write('Счётчик удаления: ' + str(clear_reminders.cleanup_counter))
+    try:
+        to_delete = Reminder.objects.filter(reminder_time__lte=datetime.datetime.now())
+        with open('delete_log.txt', 'a', encoding='utf-8') as f:
+            f.write('\nУдалено: ' + str(to_delete.count))
 
-    if clear_reminders.cleanup_counter >= 10:
-        try:
-            Reminder.objects.filter(reminder_time__lte=datetime.datetime.now())
-            clear_reminders.cleanup_counter = 0
-        except Exception as e:
-            logging.error(f"Error cleaning up reminders: {e}")
+        to_delete.delete()
+
+    except Exception as e:
+        with open('delete_log.txt', 'a', encoding='utf-8') as f:
+            f.write('\n\n' + e)

@@ -524,14 +524,14 @@ def clean_reminder_text(text: str, time_str: str) -> str:
     
     return cleaned.strip()
 
-def parse_date_query(query_text: str):
+def parse_date_query(query_text: str, delta=3):
     """
     Парсит запрос на удаление и определяет целевую дату
     Возвращает дату в формате 'YYYY-MM-DD' или None
     """
     query_lower = query_text.lower().strip()
-    moscow_tz = timezone(timedelta(hours=3))
-    current_time = datetime.now(moscow_tz)
+    my_tz = timezone(timedelta(hours=delta))
+    current_time = datetime.now(my_tz)
     
     # Сегодня
     if any(word in query_lower for word in ['сегодня', 'сегодняшние', 'на сегодня']):
