@@ -9,7 +9,20 @@ from telebot import TeleBot
 from bot import bot
 from ..models import Reminder, Task
 
+# Создание логгеров для отправки и удаления
+send_logger = logging.getLogger('send_log')
+send_handler = logging.getLogger('send_log.log', encoding='utf-8')
+send_logger.addHandler(send_handler)
+
+delete_logger = logging.getLogger('delete_log')
+delete_handler = logging.getLogger('delete_log.log', encoding='utf-8')
+delete_logger.addHandler(send_handler)
+
 def send_reminders():
+    '''
+        Функция отправки всех напоминаний, включая задачи
+    '''
+
     pre_reminders = Reminder.objects.filter(reminder_time__lte=timezone.now(), is_pre_reminder_sent=False) | \
                     Reminder.objects.filter(~Q(repeat_type=None), ~Q(repeat_time=None), repeat_time__lte=timezone.now() - datetime.timedelta(minutes=15), is_pre_reminder_sent=False)
     
@@ -23,8 +36,9 @@ def send_reminders():
             Task.objects.filter(~Q(repeat_type=None), ~Q(repeat_time=None), repeat_time__lte=timezone.now(), is_main_reminder_sent=False, is_completed=False) | \
             Task.objects.filter(transfer_time__lte=timezone.now(), is_transfered=True, is_completed=False)
     
+    send_logger.debug(f'{"=" * 5}ОТПРАВКА НАПОМИНАНИЙ {datetime.datetime.now()}{"=" * 5}')
+
     try:
-    # Отправляем предварительные напоминания
         for pre_reminder in pre_reminders:
             repeat_info = ""
             if not pre_reminder.repeat_type is None:
@@ -38,13 +52,12 @@ def send_reminders():
                 text=f"⏰ Предварительное напоминание (через 15 минут)!{repeat_info}\n"
                 f"📝 {pre_reminder.text}"
             )
-            with open('all_reminders.txt', 'a', encoding='utf-8') as f:
-                f.write('\nПредварительное напоминание: ' + str(pre_reminder.text) + str(pre_reminder.repeat_type))
-                f.write('\nПользователь: ' + str(pre_reminder.user.user_id))
 
             pre_reminder.is_pre_reminder_sent = True
             pre_reminder.save()
         
+        send_logger.debug(f'Отправлено {pre_reminders.count()} предварительных напоминаний')
+
         for reminder in reminders:
             repeat_info = ""
             if not reminder.repeat_type is None:
@@ -62,6 +75,8 @@ def send_reminders():
             reminder.is_main_reminder_sent = True
             reminder.save()
 
+        send_logger.debug(f'Отправлено {reminders.count()} напоминаний')
+
         for task in pre_tasks:
             repeat_info = ""
             if not task.repeat_type is None:
@@ -77,13 +92,10 @@ def send_reminders():
             )
             task.is_pre_reminder_sent = True
             task.save()
-        
+
+        send_logger.debug(f'Отправлено {pre_tasks.count()} предварительных напоминаний для задач')
+    
         for task in tasks:
-            kb = [
-                InlineKeyboardButton(text="✅ Завершить!", callback_data=f"t.finish|{task.id}"),
-                InlineKeyboardButton(text="⏳ Отложить", callback_data=f"t.put_off|{task.id}"),
-                InlineKeyboardButton(text="❌ Удалить", callback_data=f"t.remove|{task.id}")
-            ]
             markup = InlineKeyboardMarkup()
             markup.add(InlineKeyboardButton(text="✅ Завершить!", callback_data=f"t.finish|{task.id}"))
             markup.add(InlineKeyboardButton(text="⏳ Отложить", callback_data=f"t.put_off|{task.id}"))
@@ -106,35 +118,52 @@ def send_reminders():
             task.is_main_reminder_sent = True
             task.save()
 
+        send_logger.debug(f'Отправлено {tasks.count} напоминаний для задач')
+        
 
     except Exception as e:
-        logging.error(f"Error checking reminders: {e}")
-        with open('all_reminders.txt', 'a', encoding='utf-8') as f:
-            f.write('\nОШИБКА: ' + str(e))
+        send_logger.error(e)
+    
+    send_logger.debug(f'{"=" * 5}ОТПРАВКА ЗАВЕРШЕНА{"=" * 5}')
     
 
 def clear_reminders():
-    try:
-        to_delete = Reminder.objects.filter(reminder_time__lte=datetime.datetime.now())
-        with open('delete_log.txt', 'a', encoding='utf-8') as f:
-            f.write('\nУдалено: ' + str(to_delete.count))
+    '''
+        Удаление устаревших напоминаний и выполненных задач
+    '''
+    
+    delete_logger.debug(f'{"=" * 5}УДАЛЕНИЕ УСТАРЕВШИХ НАПОМИНАНИЙ {datetime.datetime.now()}{"=" * 5}')
 
-        to_delete.delete()
+    try:
+        reminder_delete = Reminder.objects.filter(reminder_time__lte=datetime.datetime.now())
+        task_delete = Task.objects.filter(is_completed=True)
+        count = reminder_delete.count() + task_delete.count()
+
+        reminder_delete.delete()
+        task_delete.delete()
+
+        delete_logger.debug(f'Удалено {count} объектов')
 
     except Exception as e:
         with open('delete_log.txt', 'a', encoding='utf-8') as f:
             f.write('\n\n' + e)
 
+    delete_logger.debug(f'{"=" * 5}УДАЛЕНИЕ ЗАВЕРШЕНО {datetime.datetime.now()}{"=" * 5}')
+
 
 def task_sets(call: CallbackQuery, bot: TeleBot):
-    print(call.data)
+    '''
+        Работа с задачами
+    '''
+    
     task_data = call.data.split('.')[1].split('|')
     
+    bot.answer_callback_query(callback_query_id=call.id)
+    bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
+    task = Task.objects.get(id=task_data[1])
+
     if task_data[0] == 'finish':
         try: 
-            bot.answer_callback_query(callback_query_id=call.id)
-            bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
-            task = Task.objects.get(id=task_data[1])
             task.is_completed = True
             task.save()
             bot.send_message(
@@ -150,10 +179,7 @@ def task_sets(call: CallbackQuery, bot: TeleBot):
             print(e)
 
     if task_data[0] == 'put_off':
-        try: 
-            bot.answer_callback_query(callback_query_id=call.id)
-            bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
-            task = Task.objects.get(id=task_data[1])
+        try:
             offset = datetime.timedelta(hours=int(task.user.timezone[1:]))
             custom_tz = timezone.get_fixed_timezone(offset)
             transfer_time = task.reminder_time.astimezone(custom_tz) + datetime.timedelta(minutes=30)
@@ -174,9 +200,6 @@ def task_sets(call: CallbackQuery, bot: TeleBot):
 
     if task_data[0] == 'remove':
         try: 
-            bot.answer_callback_query(callback_query_id=call.id)
-            bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
-            task = Task.objects.get(id=task_data[1])
             bot.send_message(
                 text=f'\nЗадача "{task.text}" была удалена! ✅',
                 chat_id=call.message.chat.id
