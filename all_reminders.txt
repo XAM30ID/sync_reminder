@@ -21,3 +21,32 @@
 Пользователь: 763283309ПРЕДВАРИТЕЛЬНЫЕ НАПОМИНАНИЯПРЕДВАРИТЕЛЬНЫЕ НАПОМИНАНИЯПРЕДВАРИТЕЛЬНЫЕ НАПОМИНАНИЯПРЕДВАРИТЕЛЬНЫЕ НАПОМИНАНИЯПРЕДВАРИТЕЛЬНЫЕ НАПОМИНАНИЯПРЕДВАРИТЕЛЬНЫЕ НАПОМИНАНИЯПРЕДВАРИТЕЛЬНЫЕ НАПОМИНАНИЯПРЕДВАРИТЕЛЬНЫЕ НАПОМИНАНИЯПРЕДВАРИТЕЛЬНЫЕ НАПОМИНАНИЯПРЕДВАРИТЕЛЬНЫЕ НАПОМИНАНИЯПРЕДВАРИТЕЛЬНЫЕ НАПОМИНАНИЯ
 Предварительное напоминание: Позвонить ВильдаунуNone
 Пользователь: 763283309ПРЕДВАРИТЕЛЬНЫЕ НАПОМИНАНИЯПРЕДВАРИТЕЛЬНЫЕ НАПОМИНАНИЯПРЕДВАРИТЕЛЬНЫЕ НАПОМИНАНИЯПРЕДВАРИТЕЛЬНЫЕ НАПОМИНАНИЯПРЕДВАРИТЕЛЬНЫЕ НАПОМИНАНИЯПРЕДВАРИТЕЛЬНЫЕ НАПОМИНАНИЯПРЕДВАРИТЕЛЬНЫЕ НАПОМИНАНИЯПРЕДВАРИТЕЛЬНЫЕ НАПОМИНАНИЯПРЕДВАРИТЕЛЬНЫЕ НАПОМИНАНИЯПРЕДВАРИТЕЛЬНЫЕ НАПОМИНАНИЯПРЕДВАРИТЕЛЬНЫЕ НАПОМИНАНИЯПРЕДВАРИТЕЛЬНЫЕ НАПОМИНАНИЯПРЕДВАРИТЕЛЬНЫЕ НАПОМИНАНИЯПРЕДВАРИТЕЛЬНЫЕ НАПОМИНАНИЯПРЕДВАРИТЕЛЬНЫЕ НАПОМИНАНИЯПРЕДВАРИТЕЛЬНЫЕ НАПОМИНАНИЯПРЕДВАРИТЕЛЬНЫЕ НАПОМИНАНИЯПРЕДВАРИТЕЛЬНЫЕ НАПОМИНАНИЯПРЕДВАРИТЕЛЬНЫЕ НАПОМИНАНИЯПРЕДВАРИТЕЛЬНЫЕ НАПОМИНАНИЯ
+ОШИБКА: 'InlineKeyboardButton' object is not iterable
+ОШИБКА: 'InlineKeyboardButton' object is not iterable
+ОШИБКА: 'InlineKeyboardButton' object is not iterable
+ОШИБКА: 'InlineKeyboardButton' object is not iterable
+ОШИБКА: 'InlineKeyboardButton' object is not iterable
+ОШИБКА: 'InlineKeyboardButton' object is not iterable
+ОШИБКА: 'InlineKeyboardButton' object is not iterable
+ОШИБКА: 'InlineKeyboardButton' object is not iterable
+ОШИБКА: 'InlineKeyboardButton' object is not iterable
+ОШИБКА: 'InlineKeyboardButton' object is not iterable
+ОШИБКА: 'InlineKeyboardButton' object is not iterable
+ОШИБКА: 'InlineKeyboardButton' object is not iterable
+ОШИБКА: 'InlineKeyboardButton' object is not iterable
+ОШИБКА: 'InlineKeyboardButton' object is not iterable
+ОШИБКА: 'InlineKeyboardButton' object is not iterable
+ОШИБКА: 'InlineKeyboardButton' object is not iterable
+ОШИБКА: 'InlineKeyboardButton' object is not iterable
+ОШИБКА: 'InlineKeyboardButton' object is not iterable
+ОШИБКА: 'InlineKeyboardButton' object is not iterable
+ОШИБКА: 'InlineKeyboardButton' object is not iterable
+ОШИБКА: 'InlineKeyboardButton' object is not iterable
+ОШИБКА: 'InlineKeyboardButton' object is not iterable
+ОШИБКА: 'InlineKeyboardButton' object is not iterable
+ОШИБКА: 'InlineKeyboardButton' object is not iterable
+ОШИБКА: 'InlineKeyboardButton' object is not iterable
+Предварительное напоминание: Купить хлебNone
+Пользователь: 763283309
+Предварительное напоминание: Купить хлебNone
+Пользователь: 763283309

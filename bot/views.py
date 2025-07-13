@@ -13,6 +13,7 @@ from telebot.types import Update
 from bot import bot, logger, SettingsStates
 from bot.handlers.reminder import *
 from bot.handlers.menu import *
+from bot.handlers.common import *
 
 
 @require_GET
@@ -61,13 +62,20 @@ def m_cmd_start(message: Message):
     except Exception as e:
         print(e)
 
+
 @bot.callback_query_handler(func=lambda call: call.data.startswith('o'))
 def m_selected_addressing(call: CallbackQuery):
     selected_addressing(call, bot)
 
+
 @bot.callback_query_handler(func=lambda call: call.data.startswith('f'))
 def m_selected_tone(call: CallbackQuery):
     selected_tone(call, bot)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('t'))
+def m_task_sets(call: CallbackQuery):
+    task_sets(call, bot)
 
 
 @bot.message_handler(func=lambda message: message.text == '📝 Напоминание')

@@ -293,9 +293,9 @@ def handle_text(message: Message, bot: TeleBot):
     
     # Парсим ответ ИИ   
     parsed_response = AI.parse_ai_response(ai_response['message'])
-    if parsed_response['type'] == 'reminder':
+    if parsed_response['type'] == 'reminder' or parsed_response['type'] == 'task':
         # ИИ определила, что нужно создать напоминание
-        create_reminder_from_ai(message, parsed_response, bot)
+        create_reminder_from_ai(message, parsed_response, bot, item_type=parsed_response['type'])
     elif parsed_response['type'] == 'delete':
         # ИИ определила, что нужно удалить напоминание
         handle_delete_reminder_from_ai(message, parsed_response, bot)
@@ -303,13 +303,14 @@ def handle_text(message: Message, bot: TeleBot):
         # Обычное общение
         bot.send_message(chat_id=message.chat.id, text=parsed_response['message'])
 
-def create_reminder_from_ai(message: Message, ai_data: dict, bot: TeleBot):
+def create_reminder_from_ai(message: Message, ai_data: dict, bot: TeleBot, item_type='reminder'):
     """
     Создает напоминание на основе данных от ИИ
     """
     try:
         # ОТЛАДКА: выводим что получили от ИИ
         print(f"=== ОТЛАДКА ИИ ===")
+        print(f"type: '{ai_data.get('type', '')}'")
         print(f"reminder_text: '{ai_data.get('reminder_text', '')}'")
         print(f"time_text: '{ai_data.get('time_text', '')}'")
         print(f"Исходное сообщение пользователя: '{message.text}'")
@@ -317,6 +318,7 @@ def create_reminder_from_ai(message: Message, ai_data: dict, bot: TeleBot):
         
         # Используем данные от ИИ напрямую
         reminder_text = ai_data.get('reminder_text', '').strip()
+        reminder_type = ai_data.get('type', '').strip()
         time_text = ai_data.get('time_text', '').strip()
         
         print(f"=== ПОСЛЕ ОБРАБОТКИ ===")
@@ -331,7 +333,7 @@ def create_reminder_from_ai(message: Message, ai_data: dict, bot: TeleBot):
         if not time_text:
             bot.send_message(
                 chat_id=message.chat.id,
-                text=f"Конечно! Я помогу создать напоминание: {reminder_text}\n\n"
+                text=f"Конечно! Я помогу создать: {reminder_text}\n\n"
                 "⏰ Когда вам напомнить? Укажите время, например:\n"
                 "• 'завтра в 10 утра'\n"
                 "• 'в понедельник в 15:30'\n"
@@ -382,26 +384,41 @@ def create_reminder_from_ai(message: Message, ai_data: dict, bot: TeleBot):
         aware_reminder_time = timezone.make_aware(reminder_time, timezone=custom_timezone)
         aware_pre_reminder_time = timezone.make_aware(pre_reminder_time, timezone=custom_timezone)
         created_time = timezone.make_aware(datetime.now(), timezone=custom_timezone)
-        print(aware_reminder_time)
+        
         # Добавляем напоминание в базу, используя короткое название от ИИ
         repeat_time=None
         if repeat_type == 'daily':
             repeat_time = aware_reminder_time + timedelta(days=1)
         elif repeat_type == 'weekly':
             repeat_time = aware_reminder_time + timedelta(weeks=1)
-        
-        Reminder.objects.create(
-            user_id=message.from_user.id,
-            text=final_reminder_text,
-            reminder_time=aware_reminder_time,
-            pre_reminder_time=aware_pre_reminder_time,
-            is_pre_reminder_sent=False,
-            is_main_reminder_sent=False,
-            created_at=created_time,
-            repeat_type=repeat_type,
-            repeat_time=repeat_time
-        )
-        
+        print(reminder_type)
+        if reminder_type == 'task':
+            Task.objects.create(
+                user_id=message.from_user.id,
+                text=final_reminder_text,
+                reminder_time=aware_reminder_time,
+                pre_reminder_time=aware_pre_reminder_time,
+                is_completed = False,
+                is_transfered = False,
+                transfer_time = None,
+                is_pre_reminder_sent=False,
+                is_main_reminder_sent=False,
+                created_at=created_time,
+                repeat_type=repeat_type,
+                repeat_time=repeat_time
+            )
+        else:
+            Reminder.objects.create(
+                user_id=message.from_user.id,
+                text=final_reminder_text,
+                reminder_time=aware_reminder_time,
+                pre_reminder_time=aware_pre_reminder_time,
+                is_pre_reminder_sent=False,
+                is_main_reminder_sent=False,
+                created_at=created_time,
+                repeat_type=repeat_type,
+                repeat_time=repeat_time
+            )
         # Формируем сообщение о создании напоминания
         repeat_info = ""
         if repeat_type:
@@ -409,14 +426,22 @@ def create_reminder_from_ai(message: Message, ai_data: dict, bot: TeleBot):
                 repeat_info = "\n🔄 Тип: каждый день"
             elif repeat_type == 'weekly':
                 repeat_info = "\n🔄 Тип: каждую неделю"
-        
-        bot.send_message(
-            chat_id=message.chat.id,
-            text=f"✅ Напоминание установлено!\n"
-            f"📝 Текст: {final_reminder_text}\n"
-            f"🕐 Время: {format_moscow_time(reminder_time)}\n"
-            f"⏰ Предварительное напоминание: {format_moscow_time(pre_reminder_time)}{repeat_info}"
-        )
+        if reminder_type == 'task':
+            bot.send_message(
+                chat_id=message.chat.id,
+                text=f"✅ Задача установлена!\n"
+                f"📝 Текст: {final_reminder_text}\n"
+                f"🕐 Время: {format_moscow_time(reminder_time)}\n"
+                f"⏰ Предварительное напоминание: {format_moscow_time(pre_reminder_time)}{repeat_info}"
+            )
+        else:
+            bot.send_message(
+                chat_id=message.chat.id,
+                text=f"✅ Напоминание установлено!\n"
+                f"📝 Текст: {final_reminder_text}\n"
+                f"🕐 Время: {format_moscow_time(reminder_time)}\n"
+                f"⏰ Предварительное напоминание: {format_moscow_time(pre_reminder_time)}{repeat_info}"
+            )
         return True
     except Exception as e:
         print(f"Error creating reminder: {e}")
@@ -462,7 +487,6 @@ def handle_delete_reminder_from_ai(message: Message, ai_data: dict, bot: TeleBot
 
             all_reminders = Reminder.objects.filter(user_id=message.from_user.id)
             for reminder in all_reminders:
-                print(reminder.reminder_time.astimezone(tz=custom_timezone).date(), target_date.date())
                 if reminder.reminder_time.astimezone(tz=custom_timezone).date() == target_date.date():
                     matching_reminders.append(reminder)
         

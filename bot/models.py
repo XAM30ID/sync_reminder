@@ -73,7 +73,7 @@ class Task(models.Model):
     is_transfered = models.BooleanField(verbose_name='Задача перенесена')
     transfer_time = models.DateTimeField(verbose_name='Время переноса', null=True, blank=True)
     is_pre_reminder_sent = models.BooleanField(verbose_name='Напоминание заранее отправлено')
-    is_pre_main_sent = models.BooleanField(verbose_name='Напоминание отправлено')
+    is_main_reminder_sent = models.BooleanField(verbose_name='Напоминание отправлено')
     created_at = models.DateTimeField(verbose_name='Создано')
     repeat_type = models.TextField(verbose_name='Повторение', choices=REPEAT_TYPES, null=True, blank=True)
     repeat_time = models.DateTimeField(verbose_name='Дата и время повторения', null=True, blank=True)
