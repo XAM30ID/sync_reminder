@@ -25,18 +25,21 @@ user_delete_context = {}
 
 
 def reminder_button(message: Message, bot: TeleBot):
+    '''
+        Кнопка напоминаний и задач
+    '''
     bot.send_chat_action(chat_id=message.chat.id, action="typing")
     bot.send_message(
         chat_id=message.chat.id,
         text="🤖 Теперь я могу понимать ваши запросы! \n\n"
         "Просто напишите или скажите мне, что вы хотите:\n\n"
-        "✅ Для создания напоминаний:\n"
+        "✅ Для создания напоминаний и задач:\n"
         "• 'Напомни мне завтра в 10 утра купить хлеб'\n"
         "• 'Поставь напоминание на понедельник в 15:30 встреча'\n"
         "• 'Мне нужно каждый день в 22:00 принимать витамины'\n"
         "• 'Завтра погулять с собакой'\n"
         "• 'Через 2 часа позвонить маме'\n\n"
-        "❌ Для удаления напоминаний:\n"
+        "❌ Для удаления напоминаний и задач:\n"
         "• 'Удали напоминание про кота'\n"
         "• 'Убери напоминание о встрече'\n"
         "• 'Отмени напоминание принимать витамины'\n"
@@ -52,7 +55,8 @@ def reminder_button(message: Message, bot: TeleBot):
 def list_reminders(message: Message, bot: TeleBot):
     bot.send_chat_action(chat_id=message.chat.id, action="typing")
     reminders = Reminder.objects.filter(user_id=message.from_user.id)
-    if not reminders:
+    tasks = Task.objects.filter(user_id=message.from_user.id)
+    if not reminders and not tasks:
         bot.send_message(
             chat_id=message.chat.id,
             text="📋 У вас пока нет активных напоминаний.\n\n"
@@ -66,6 +70,8 @@ def list_reminders(message: Message, bot: TeleBot):
     # Группируем напоминания по типу
     one_time_reminders = reminders.filter(repeat_type=None)
     recurring_reminders = reminders.exclude(repeat_type=None)
+    one_time_tasks = tasks.filter(repeat_type=None)
+    recurring_tasks = tasks.exclude(repeat_type=None)
     
     
     # Формируем красивое сообщение
@@ -128,13 +134,73 @@ def list_reminders(message: Message, bot: TeleBot):
                 f"🔄 **{reminder.text}** ({repeat_text})\n"
                 f"   🕐 Следующее: {next_time}\n"
             )
-    
+
+    if one_time_tasks:
+        message_parts.append("")
+        message_parts.append("📅 **Разовые задачи:**")
+        for i, task in enumerate(one_time_tasks, 1):
+            # Убираем информацию о часовом поясе
+            offset = timedelta(hours=int(task.user.timezone[1:]))
+            custom_tz = timezone.get_fixed_timezone(offset)
+            task_time = task.reminder_time.astimezone(custom_tz)
+            current_time = datetime.now(custom_tz)
+            
+            # Определяем статус
+            if task_time > current_time:
+                status_icon = "⏳"
+                time_until = task_time - current_time
+                if time_until.days > 0:
+                    time_info = f"через {time_until.days} дн."
+                elif time_until.seconds > 3600:
+                    hours = time_until.seconds // 3600
+                    time_info = f"через {hours} ч."
+                else:
+                    minutes = time_until.seconds // 60
+                    time_info = f"через {minutes} мин."
+            else:
+                status_icon = "🔔"
+                time_info = "скоро"
+            
+            message_parts.append(
+                f"{status_icon} **{task.text}**\n"
+                f"   🕐 {format_moscow_time(task_time)} ({time_info})\n"
+            )
+
+    # Повторяющиеся задачи
+    if recurring_tasks:
+        if one_time_tasks:
+            message_parts.append("")  # Пустая строка для разделения
+        
+        message_parts.append("🔄 **Повторяющиеся напоминания:**")
+        for task in recurring_tasks:
+            task_time = datetime.fromisoformat(task.reminder_time)
+            
+            if task.repeat_type == 'daily':
+                repeat_text = "каждый день"
+                next_time = task_time.strftime("%H:%M")
+
+            elif task.repeat_type == 'weekly':
+                repeat_text = "каждую неделю"
+                weekdays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
+                weekday = weekdays[task_time.weekday()]
+                next_time = f"{weekday} в {task_time.strftime('%H:%M')}"
+
+            else:
+                repeat_text = "периодически"
+                next_time = format_moscow_time(task_time)
+            
+            message_parts.append(
+                f"🔄 **{task.text}** ({repeat_text})\n"
+                f"   🕐 Следующее: {next_time}\n"
+            )
+
     # Добавляем информационное сообщение
     message_parts.append(
         "\n💡 **Информация:**\n"
-        "• Разовые напоминания удаляются автоматически после выполнения\n"
-        "• Повторяющиеся напоминания работают по расписанию\n"
+        "• Разовые напоминания и задачи удаляются автоматически после выполнения\n"
+        "• Повторяющиеся напоминания и задачи работают по расписанию\n"
         "• Вы получите уведомление за 15 минут до события"
+        "• При переносе, задача будет отложена на полчаса"
     )
     
     # Отправляем одним сообщением

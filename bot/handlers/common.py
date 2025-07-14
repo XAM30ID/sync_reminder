@@ -18,6 +18,7 @@ delete_logger = logging.getLogger('delete_log')
 delete_handler = logging.getLogger('delete_log.log', encoding='utf-8')
 delete_logger.addHandler(send_handler)
 
+
 def send_reminders():
     '''
         Функция отправки всех напоминаний, включая задачи

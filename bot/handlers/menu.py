@@ -12,10 +12,13 @@ start_markup.add(InlineKeyboardButton(text='На Вы', callback_data='o.vy'))
 
 main_markup = ReplyKeyboardMarkup(resize_keyboard=True)
 main_markup.add(KeyboardButton(text='📝 Напоминание'))
-main_markup.add(KeyboardButton(text='📋 Мои напоминания'))
+main_markup.add(KeyboardButton(text='⚙️ Задача'))
+main_markup.add(KeyboardButton(text='📋 Все напоминания и задачи'))
 
 def cmd_start(message: Message, bot: TeleBot):
-    """Обработчик команды /start"""
+    """
+        Обработчик команды /start
+    """
     bot.set_state(message.from_user.id, SettingsStates.addressing, message.chat.id)
     return bot.send_message(
         chat_id=message.chat.id,
@@ -27,10 +30,9 @@ def cmd_start(message: Message, bot: TeleBot):
 
 
 def selected_addressing(call: CallbackQuery, bot: TeleBot):
-    addressings = {
-        'ty': 'ты',
-        'vy': 'вы',
-    }
+    '''
+        Выбор обращения к пользователю
+    '''
     addressing = call.data.split('.')[-1]
     try:
         communication_markup = InlineKeyboardMarkup()
@@ -53,7 +55,6 @@ def selected_addressing(call: CallbackQuery, bot: TeleBot):
             chat_id=call.message.chat.id,
             text='Извините, возникла ошибка. Попробуйте снова'
         )
-        start_markup.add(InlineKeyboardButton(text='➡️ Пропустить', callback_data=f'f.skip'))
         return bot.edit_message_text(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
@@ -65,6 +66,9 @@ def selected_addressing(call: CallbackQuery, bot: TeleBot):
 
 
 def selected_tone(call: CallbackQuery, bot: TeleBot):
+    '''
+        Выбор тона общения
+    '''
     data = call.data.split('.')[-1]
     bot.answer_callback_query(callback_query_id=call.id)
     if data == 'return':
@@ -76,31 +80,7 @@ def selected_tone(call: CallbackQuery, bot: TeleBot):
             reply_markup=start_markup,
             parse_mode="Markdown"
         ) 
-    elif data == 'skip':
-        current_time = format_moscow_time(get_moscow_now(), "%d.%m.%Y %H:%M")
-        return bot.edit_message_text(
-            chat_id=call.message.chat.id,
-            message_id=call.message.message_id,
-            text=f"👋 Привет! Я бот для создания напоминаний.\n\n"
-            f"🕐 Текущее время (МСК): {current_time}\n\n"
-            f"Теперь я понимаю много новых форматов:\n\n"
-            f"📅 **Относительные даты:**\n"
-            f"• 'завтра в 8:30 выпить витамины'\n"
-            f"• 'послезавтра в 14:00 встреча'\n\n"
-            f"📆 **Дни недели:**\n"
-            f"• 'в субботу в 10:00 уборка'\n"
-            f"• 'в понедельник в 9:00 работа'\n\n"
-            f"🔄 **Циклические напоминания:**\n"
-            f"• 'каждый день в 22:00 витамины'\n"
-            f"• 'каждый понедельник в 8:00 спорт'\n"
-            f"• 'каждое утро зарядка'\n"
-            f"• 'каждый вечер прогулка'\n\n"
-            f"⏰ **Обычные форматы:**\n"
-            f"• 'через 2 часа сделать зарядку'\n"
-            f"• 'в 15:30 позвонить маме'",
-            reply_markup=main_markup,
-            parse_mode="Markdown"
-        ) 
+    
     else:
         addressing, tone = data.split('|')
         bot.add_data(call.from_user.id, call.message.chat.id, tone=tone)
@@ -115,6 +95,9 @@ def selected_tone(call: CallbackQuery, bot: TeleBot):
 
 
 def final_sets(message: Message, bot: TeleBot):
+    '''
+        Последние установки параметров общения для пользователя
+    '''
     if message.text.startswith('+') or message.text.startswith('-') and len(message.text) <= 3:
         with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
             bot.delete_state(message.from_user.id, message.chat.id)
