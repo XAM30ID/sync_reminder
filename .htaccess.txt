@@ -1,0 +1,2 @@
+PassengerEnabled On
+PassengerPython /home/p/pacmaknl/test-bot-reminder/sync_reminder/venv/bin/python3.13
