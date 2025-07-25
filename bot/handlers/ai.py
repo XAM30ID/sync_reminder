@@ -5,7 +5,7 @@ from datetime import datetime
 
 import dotenv
 import openai
-from ..utils.timezone import get_moscow_now, format_moscow_time
+from ..utils.timezone import get_now, format_moscow_time
 
 dotenv.load_dotenv()
 
@@ -13,7 +13,7 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 
 def get_current_datetime_info():
     """Получает текущую дату и время для ИИ"""
-    now = get_moscow_now()
+    now = get_now()
     weekdays = ['понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота', 'воскресенье']
     current_weekday = weekdays[now.weekday()]
     

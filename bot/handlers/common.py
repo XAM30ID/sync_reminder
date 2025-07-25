@@ -11,11 +11,11 @@ from ..models import Reminder, Task
 
 # Создание логгеров для отправки и удаления
 send_logger = logging.getLogger('send_log')
-send_handler = logging.getLogger('send_log.log', encoding='utf-8')
+send_handler = logging.getLogger('send_log.log')
 send_logger.addHandler(send_handler)
 
 delete_logger = logging.getLogger('delete_log')
-delete_handler = logging.getLogger('delete_log.log', encoding='utf-8')
+delete_handler = logging.getLogger('delete_log.log')
 delete_logger.addHandler(send_handler)
 
 
@@ -24,10 +24,10 @@ def send_reminders():
         Функция отправки всех напоминаний, включая задачи
     '''
 
-    pre_reminders = Reminder.objects.filter(reminder_time__lte=timezone.now(), is_pre_reminder_sent=False) | \
+    pre_reminders = Reminder.objects.filter(reminder_time__lte=timezone.now() - datetime.timedelta(minutes=15), is_pre_reminder_sent=False) | \
                     Reminder.objects.filter(~Q(repeat_type=None), ~Q(repeat_time=None), repeat_time__lte=timezone.now() - datetime.timedelta(minutes=15), is_pre_reminder_sent=False)
     
-    pre_tasks = Task.objects.filter(reminder_time__lte=timezone.now(), is_pre_reminder_sent=False) | \
+    pre_tasks = Task.objects.filter(reminder_time__lte=timezone.now() - datetime.timedelta(minutes=15), is_pre_reminder_sent=False) | \
                 Task.objects.filter(~Q(repeat_type=None), ~Q(repeat_time=None), repeat_time__lte=timezone.now() - datetime.timedelta(minutes=15), is_pre_reminder_sent=False)
     
     reminders = Reminder.objects.filter(reminder_time__lte=timezone.now(), is_main_reminder_sent=False) | \

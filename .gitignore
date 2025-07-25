@@ -13,3 +13,4 @@ __pycache__
 migrations
 */migrations
 */*/migrations
+main/settings.py

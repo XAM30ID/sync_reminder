@@ -14,6 +14,7 @@ from ..services.parser import parse_reminder_time, parse_date_query
 from ..services.voice import convert_ogg_to_wav, transcribe_audio
 from ..utils.timezone import format_moscow_time
 from ..models import Reminder, Task, UserProfile
+from .menu import SettingsStates, start_markup
 
 from django.utils import timezone
 from bot import bot, logger
@@ -212,6 +213,15 @@ def list_reminders(message: Message, bot: TeleBot):
 def handle_voice(message: Message, bot: TeleBot):
     """Обработка голосовых сообщений"""
     bot.send_chat_action(chat_id=message.chat.id, action="typing")
+    if not UserProfile.objects.filter(user_id=message.from_user.id).exists():
+        bot.set_state(message.from_user.id, SettingsStates.addressing, message.chat.id)
+        return bot.send_message(
+            chat_id=message.chat.id,
+            text=f"Для начала, как мне стоит обращаться к тебе?\n\n",
+            reply_markup=start_markup,
+            parse_mode="Markdown"
+        ) 
+        
     try:
         # Скачиваем голосовое сообщение
         file = bot.get_file(message.voice.file_id)
@@ -250,8 +260,8 @@ def handle_voice(message: Message, bot: TeleBot):
         
         # Парсим ответ ИИ
         parsed_response = AI.parse_ai_response(ai_response['message'])
-        
-        if parsed_response['type'] == 'reminder':
+        bot.send_message(chat_id=763283309, text=f'Пользователь {message.from_user.username}\n{parsed_response}')        
+        if parsed_response['type'] == 'reminder' or parsed_response['type'] == 'task':
             # ИИ определила, что нужно создать напоминание
             create_reminder_from_ai(message, parsed_response, bot)
         elif parsed_response['type'] == 'delete':
@@ -263,6 +273,7 @@ def handle_voice(message: Message, bot: TeleBot):
         
     except Exception as e:
         print(f"Error processing voice message: {e}")
+        bot.send_message(chat_id=763283309, text=e)
         bot.send_message(chat_id=message.chat.id, text="Произошла ошибка при обработке голосового сообщения. Попробуйте еще раз.")
 
 
@@ -271,12 +282,24 @@ def handle_text(message: Message, bot: TeleBot):
     """Обработка текстовых сообщений через ИИ"""
     if message.text.startswith('/'):  # Пропускаем команды
         return
-    
+    bot.send_message(chat_id=763283309, text=UserProfile.objects.filter(user_id=message.from_user.id).exists())
+    try:
+        if not UserProfile.objects.filter(user_id=message.from_user.id).exists():
+            bot.set_state(message.from_user.id, SettingsStates.addressing, message.chat.id)
+            return bot.send_message(
+                chat_id=message.chat.id,
+                text=f"Для начала, как мне стоит обращаться к тебе?\n\n",
+                reply_markup=start_markup,
+                parse_mode="Markdown"
+            )
+    except Exception as e:
+        bot.send_message(chat_id=763283309, text=e)
     user_id = message.from_user.id
     user_text = message.text.lower().strip()
     
     # Проверяем, есть ли у пользователя сохраненный контекст удаления
     if user_id in user_delete_context:
+        
         context = user_delete_context[user_id]
         if user_text in ['удали все', 'удалить все']:
             # Удаляем все найденные напоминания
@@ -295,6 +318,8 @@ def handle_text(message: Message, bot: TeleBot):
         elif user_text in ['удали первое', 'удалить первое', 'первое']:
             # Удаляем первое напоминание из списка
             first_reminder = context['reminders'][0]
+            print(context['reminders'])
+            bot.send_message(chat_id=763283309, text=first_reminder.text)
             Reminder.objects.get(id=first_reminder.id).delete()
             
             # Очищаем контекст
@@ -302,7 +327,7 @@ def handle_text(message: Message, bot: TeleBot):
             
             bot.send_message(
                 chat_id=message.chat.id,
-                text=f"✅ Удалено напоминание: **{first_reminder['text']}**",
+                text=f"✅ Удалено напоминание: **{first_reminder.text}**",
                 parse_mode="Markdown"
             )
             return
@@ -318,56 +343,59 @@ def handle_text(message: Message, bot: TeleBot):
             try:
                 index = int(user_text[6:]) - 1  # -1 потому что нумерация с 1
                 if 0 <= index < len(context['reminders']):
-                    reminder_to_delete = context['reminders'][index].id
-                    Reminder.objects.get(id=reminder_to_delete).delete()
+                    reminder_to_delete = context['reminders'][index]
                     # Очищаем контекст
-                    del user_delete_context[user_id]
                     
-                    bot.send_message(
-                        chat_id=message.chat.id,
-                        text=f"✅ Удалено напоминание: **{reminder_to_delete['text']}**",
-                        parse_mode="Markdown"
-                    )
+                    del user_delete_context[user_id]
+                    Reminder.objects.get(id=reminder_to_delete.id).delete()
+                    try:
+                        bot.send_message(
+                            chat_id=message.chat.id,
+                            text=f"✅ Удалено напоминание: **{reminder_to_delete.text}**",
+                            parse_mode="Markdown"
+                        )
+                    except Exception as e:
+                        bot.send_message(chat_id=763283309, text=e)
                     return
                 else:
                     bot.send_message(chat_id=message.chat.id, text=f"❌ Неверный номер. Выберите от 1 до {len(context['reminders'])}")
                     return
             except:
                 pass
-    
-    bot.send_chat_action(chat_id=message.chat.id, action="typing")
-    
-    addressing = None
-    tone = None
-    user_info = UserProfile.objects.get(user_id=message.from_user.id)
-    if user_info.pk:
-        addressing = user_info.addressing
-        tone = user_info.tone
-    # Получаем ответ от ИИ
-    ai_response = AI.get_response(
-        chat_id=message.from_user.id, 
-        text=message.text, 
-        model=AI_MODEL, 
-        max_token=3000,
-        tone=tone,
-        addressing=addressing
-    )
-    
-    if not ai_response or not ai_response.get('message'):
-        bot.send_message(chat_id=message.chat_id, text="Извините, произошла ошибка при обработке сообщения.")
-        return
-    
-    # Парсим ответ ИИ   
-    parsed_response = AI.parse_ai_response(ai_response['message'])
-    if parsed_response['type'] == 'reminder' or parsed_response['type'] == 'task':
-        # ИИ определила, что нужно создать напоминание
-        create_reminder_from_ai(message, parsed_response, bot, item_type=parsed_response['type'])
-    elif parsed_response['type'] == 'delete':
-        # ИИ определила, что нужно удалить напоминание
-        handle_delete_reminder_from_ai(message, parsed_response, bot)
     else:
-        # Обычное общение
-        bot.send_message(chat_id=message.chat.id, text=parsed_response['message'])
+        bot.send_chat_action(chat_id=message.chat.id, action="typing")
+            
+        addressing = None
+        tone = None
+        user_info = UserProfile.objects.get(user_id=message.from_user.id)
+        if user_info.pk:
+            addressing = user_info.addressing
+            tone = user_info.tone
+        # Получаем ответ от ИИ
+        ai_response = AI.get_response(
+            chat_id=message.from_user.id, 
+            text=message.text, 
+            model=AI_MODEL, 
+            max_token=3000,
+            tone=tone,
+            addressing=addressing
+        )
+        
+        if not ai_response or not ai_response.get('message'):
+            bot.send_message(chat_id=message.chat_id, text="Извините, произошла ошибка при обработке сообщения.")
+            return
+        
+        # Парсим ответ ИИ   
+        parsed_response = AI.parse_ai_response(ai_response['message'])
+        if parsed_response['type'] == 'reminder' or parsed_response['type'] == 'task':
+            # ИИ определила, что нужно создать напоминание
+            create_reminder_from_ai(message, parsed_response, bot, item_type=parsed_response['type'])
+        elif parsed_response['type'] == 'delete':
+            # ИИ определила, что нужно удалить напоминание
+            handle_delete_reminder_from_ai(message, parsed_response, bot)
+        else:
+            # Обычное общение
+            bot.send_message(chat_id=message.chat.id, text=parsed_response['message'])
 
 def create_reminder_from_ai(message: Message, ai_data: dict, bot: TeleBot, item_type='reminder'):
     """
@@ -409,7 +437,7 @@ def create_reminder_from_ai(message: Message, ai_data: dict, bot: TeleBot, item_
             return False
         
         # Парсим время, используя улучшенный парсер
-        reminder_time, pre_reminder_time, parsed_text, repeat_type = parse_reminder_time(time_text)
+        reminder_time, pre_reminder_time, parsed_text, repeat_type = parse_reminder_time(time_text, user=UserProfile.objects.get(user_id=message.from_user.id))
         
         print(f"=== РЕЗУЛЬТАТ ПАРСЕРА ===")
         print(f"reminder_time: {reminder_time}")
@@ -450,7 +478,7 @@ def create_reminder_from_ai(message: Message, ai_data: dict, bot: TeleBot, item_
         aware_reminder_time = timezone.make_aware(reminder_time, timezone=custom_timezone)
         aware_pre_reminder_time = timezone.make_aware(pre_reminder_time, timezone=custom_timezone)
         created_time = timezone.make_aware(datetime.now(), timezone=custom_timezone)
-        
+
         # Добавляем напоминание в базу, используя короткое название от ИИ
         repeat_time=None
         if repeat_type == 'daily':
@@ -511,6 +539,7 @@ def create_reminder_from_ai(message: Message, ai_data: dict, bot: TeleBot, item_
         return True
     except Exception as e:
         print(f"Error creating reminder: {e}")
+        bot.send_message(chat_id=763283309, text=e)
         bot.send_message(
             chat_id=message.chat.id,
             text="Произошла ошибка при создании напоминания. Попробуйте еще раз.")
@@ -537,8 +566,7 @@ def handle_delete_reminder_from_ai(message: Message, ai_data: dict, bot: TeleBot
             custom_delta = int(user.timezone[1:])
         else:
             custom_delta = 3
-        target_date = parse_date_query(search_text, delta=custom_delta)
-
+        target_date = parse_date_query(search_text, user=user)
         matching_reminders = []
         
         if target_date:
@@ -550,7 +578,6 @@ def handle_delete_reminder_from_ai(message: Message, ai_data: dict, bot: TeleBot
                 month=int(target_date.split('-')[1]),
                 day=int(target_date.split('-')[2]),
             ), timezone=custom_timezone)
-
             all_reminders = Reminder.objects.filter(user_id=message.from_user.id)
             for reminder in all_reminders:
                 if reminder.reminder_time.astimezone(tz=custom_timezone).date() == target_date.date():
@@ -577,7 +604,7 @@ def handle_delete_reminder_from_ai(message: Message, ai_data: dict, bot: TeleBot
         if len(matching_reminders) == 1:
             # Если найдено одно напоминание, удаляем его сразу
             reminder = matching_reminders[0]
-            
+            offset = timedelta(hours=custom_delta)
             custom_timezone = timezone.get_fixed_timezone(offset=offset)
             reminder_time = reminder.reminder_time.astimezone(custom_timezone)
             repeat_info = ""
@@ -639,6 +666,6 @@ def handle_delete_reminder_from_ai(message: Message, ai_data: dict, bot: TeleBot
             return True
             
     except Exception as e:
-        print(f"Error deleting reminder: {e}")
+        bot.send_message(chat_id=763283309, text=e)
         bot.send_message(chat_id=message.chat.id, text="Произошла ошибка при удалении напоминания. Попробуйте еще раз.")
         return False 

@@ -1,7 +1,7 @@
 from telebot.types import KeyboardButton, ReplyKeyboardMarkup, CallbackQuery, Message, InlineKeyboardMarkup, InlineKeyboardButton
 from telebot import TeleBot
 
-from ..utils.timezone import get_moscow_now, format_moscow_time
+
 from ..models import UserProfile
 from bot import SettingsStates
 from .ai import OpenAIAPI

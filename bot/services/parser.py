@@ -1,8 +1,8 @@
 from datetime import datetime, timedelta
 import dateparser
 import re
-from ..utils.timezone import get_moscow_now
-from datetime import timezone
+from ..utils.timezone import get_now
+from django.utils import timezone
 
 
 def normalize_time_string(text: str) -> str:
@@ -79,7 +79,7 @@ def get_weekday_number(day_name: str) -> int:
 
 def calculate_next_weekday(target_weekday: int, time_str: str = None, force_next_week: bool = False) -> datetime:
     """Вычислить следующую дату для указанного дня недели"""
-    now = get_moscow_now()
+    now = get_now()
     current_weekday = now.weekday()
     
     # Вычисляем количество дней до следующего нужного дня
@@ -183,6 +183,8 @@ def extract_time_and_text(text: str) -> tuple[str, str, str]:
     ]
     
     for pattern in time_patterns:
+        if normalized_text.lower().strip() == 'через час':
+            normalized_text = 'через 1 час'
         match = re.search(pattern, normalized_text, re.IGNORECASE)
         if match:
             time_str = match.group(0)
@@ -191,10 +193,9 @@ def extract_time_and_text(text: str) -> tuple[str, str, str]:
             # Дополнительно очищаем текст от артефактов
             reminder_text = clean_reminder_text(reminder_text, time_str)
             return time_str, reminder_text, repeat_type
-    
     return None, text, repeat_type
 
-def parse_reminder_time(text: str) -> tuple[datetime, datetime, str, str]:
+def parse_reminder_time(text: str, user) -> tuple[datetime, datetime, str, str]:
     """
     Парсит время и текст напоминания из сообщения
     Возвращает кортеж (время_напоминания, время_предварительного_напоминания, текст_напоминания, тип_повторения)
@@ -203,7 +204,7 @@ def parse_reminder_time(text: str) -> tuple[datetime, datetime, str, str]:
     if not time_str:
         return None, None, text, None
     
-    now = get_moscow_now()
+    now = get_now(user=user)
     reminder_time = None
     # Обработка "через X минут/часов/дней"
     # Сначала проверяем полный паттерн с временем
@@ -220,9 +221,15 @@ def parse_reminder_time(text: str) -> tuple[datetime, datetime, str, str]:
             target_date = now + timedelta(days=number)
             
             # Парсим указанное время
+            if user.pk:
+                utc_offset = int(user.timezone[1:])
+            else:
+                utc_offset = 3
+            offset = timedelta(hours=utc_offset)
+            custom_timezone = timezone.get_fixed_timezone(offset=offset)
             parsed_time = dateparser.parse(time_part, settings={
                 'PREFER_DATES_FROM': 'future',
-                'TIMEZONE': 'Europe/Moscow',
+                'TIMEZONE': str(custom_timezone),
                 'RETURN_AS_TIMEZONE_AWARE': False,
             })
             if parsed_time:
@@ -255,9 +262,15 @@ def parse_reminder_time(text: str) -> tuple[datetime, datetime, str, str]:
                 time_match = re.search(r'в\s*(\d{1,2}(?::\d{2})?\s*(?:am|pm|утра|вечера|дня|ночи)?)', time_str)
                 if time_match:
                     time_part = time_match.group(1)
+                    if user.pk:
+                        utc_offset = int(user.timezone[1:])
+                    else:
+                        utc_offset = 3
+                    offset = timedelta(hours=utc_offset)
+                    custom_timezone = timezone.get_fixed_timezone(offset=offset)
                     parsed_time = dateparser.parse(time_part, settings={
                         'PREFER_DATES_FROM': 'future',
-                        'TIMEZONE': 'Europe/Moscow',
+                        'TIMEZONE': str(custom_timezone),
                         'RETURN_AS_TIMEZONE_AWARE': False,
                     })
                     if parsed_time:
@@ -295,9 +308,15 @@ def parse_reminder_time(text: str) -> tuple[datetime, datetime, str, str]:
         time_match = re.search(r'(\d{1,2}(?::\d{2})?\s*(?:am|pm|утра|вечера|дня|ночи)?)', time_str)
         if time_match:
             time_part = time_match.group(1)
+            if user.pk:
+                utc_offset = int(user.timezone[1:])
+            else:
+                utc_offset = 3
+            offset = timedelta(hours=utc_offset)
+            custom_timezone = timezone.get_fixed_timezone(offset=offset)
             parsed_time = dateparser.parse(time_part, settings={
                 'PREFER_DATES_FROM': 'future',
-                'TIMEZONE': 'Europe/Moscow',
+                'TIMEZONE': str(custom_timezone),
                 'RETURN_AS_TIMEZONE_AWARE': False,
             })
             if parsed_time:
@@ -380,16 +399,22 @@ def parse_reminder_time(text: str) -> tuple[datetime, datetime, str, str]:
                         reminder_time = target_date.replace(hour=9, minute=0, second=0, microsecond=0)
     
     # Обычный парсинг времени (только если время еще не установлено)
-    if not reminder_time:
+    if not reminder_time:        
+        if user.pk:
+            utc_offset = int(user.timezone[1:])
+        else:
+            utc_offset = 3
+        offset = timedelta(hours=utc_offset)
+        custom_timezone = timezone.get_fixed_timezone(offset=offset)
         settings = {
             'PREFER_DATES_FROM': 'future',
-            'TIMEZONE': 'Europe/Moscow',
+            'TIMEZONE': str(custom_timezone),
             'RETURN_AS_TIMEZONE_AWARE': False,
             'PREFER_DAY_OF_MONTH': 'first',
             'DATE_ORDER': 'DMY'
         }
-        
-        reminder_time = dateparser.parse(time_str, settings=settings)
+        reminder_time = timezone.make_aware(dateparser.parse(time_str, settings=settings), timezone=custom_timezone)
+        print(dateparser)
         if reminder_time and reminder_time < now:
             reminder_time += timedelta(days=1)
     
@@ -417,8 +442,14 @@ def parse_reminder_time(text: str) -> tuple[datetime, datetime, str, str]:
     
     # Создаем время для предварительного напоминания (за 15 минут)
     pre_reminder_time = reminder_time - timedelta(minutes=15)
-    
-    return reminder_time, pre_reminder_time, reminder_text, repeat_type
+        
+    if user.pk:
+        utc_offset = int(user.timezone[1:])
+    else:
+        utc_offset = 3
+    offset = timedelta(hours=utc_offset)
+    custom_timezone = timezone.get_fixed_timezone(offset=offset)
+    return timezone.make_naive(reminder_time, timezone=custom_timezone), timezone.make_naive(pre_reminder_time, timezone=custom_timezone), reminder_text, repeat_type
 
 def clean_reminder_text(text: str, time_str: str) -> str:
     """
@@ -524,14 +555,13 @@ def clean_reminder_text(text: str, time_str: str) -> str:
     
     return cleaned.strip()
 
-def parse_date_query(query_text: str, delta=3):
+def parse_date_query(query_text: str, user):
     """
     Парсит запрос на удаление и определяет целевую дату
     Возвращает дату в формате 'YYYY-MM-DD' или None
     """
     query_lower = query_text.lower().strip()
-    my_tz = timezone(timedelta(hours=delta))
-    current_time = datetime.now(my_tz)
+    current_time = get_now(user=user)
     
     # Сегодня
     if any(word in query_lower for word in ['сегодня', 'сегодняшние', 'на сегодня']):
