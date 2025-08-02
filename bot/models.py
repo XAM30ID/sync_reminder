@@ -18,6 +18,8 @@ class UserProfile(models.Model):
     addressing = models.CharField(verbose_name='Обращение', choices={'ty': 'Ты', 'vy': 'Вы'})
     tone = models.CharField(verbose_name='Тон общения', choices={'business': 'Деловой', 'friendly': 'Дружелюбный', 'neutral': 'Нейтральный'})
     timezone = models.CharField(verbose_name='Часовой пояс', default='+3', help_text='Разница с UTC в формате "±0"')
+    use_google_calendar = models.BooleanField(verbose_name='Включить Google-Календарь', default=False)
+    google_email = models.EmailField(verbose_name='Почта для Google-Календаря', default=None, blank=True, null=True)
 
     def __str__(self):
         return f'Пользователь {self.username}'

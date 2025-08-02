@@ -13,6 +13,7 @@ from telebot.types import Update
 from bot import bot, logger, SettingsStates
 from bot.handlers.reminder import *
 from bot.handlers.menu import *
+from bot.handlers.google_cal import *
 from bot.handlers.common import *
 
 
@@ -24,7 +25,6 @@ def set_webhook(request: HttpRequest) -> JsonResponse:
     bot.set_webhook(url=f"{settings.HOOK}/bot/{settings.BOT_TOKEN}", allowed_updates=['message', 'callback_query'])
     bot.send_message(settings.OWNER_ID, "webhook set")
     return JsonResponse({"message": "OK"}, status=200)
-
 
 @csrf_exempt
 @require_POST
@@ -55,13 +55,73 @@ def m_cmd_start(message: Message):
     '''
         Обработчик команды старт
     '''
-    
     try:
         cmd_start(message=message, bot=bot)
     except Exception as e:
         print(e)
 
+@bot.message_handler(commands=['setting'])
+def m_cmd_setting(message: Message):
+    '''
+        Обработчик команды setting
+    '''
+    
+    try:
+        cmd_setting(message=message, bot=bot)
+    except Exception as e:
+        print(e)
 
+
+@bot.message_handler(commands=['google_calendar'])
+def m_google_calendar(message: Message):
+    '''
+        Обработчик команды для работы с гугл календарём
+    '''
+    try:
+        start_google(message=message, bot=bot)
+    except Exception as e:
+        print(e)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('G'))
+def m_selected_google_action(call: CallbackQuery):
+    '''
+        Работа с Гугл календарём
+    '''
+    data = call.data.split('.')[-1]
+    if data == 'cancel':
+        bot.delete_state(user_id=call.from_user.id, chat_id=call.message.chat.id)
+        bot.delete_message(message_id=call.message.id, chat_id=call.message.chat.id)
+        bot.send_message(
+            chat_id=call.message.chat.id,
+            text='Работа с Гугл календарём отменена'
+        )
+
+    if data == 'activate' or data == 'diactivate':
+        change_google_using(call=call, bot=bot)
+    
+    if data == 'change_email':
+        bot.delete_message(message_id=call.message.id, chat_id=call.message.chat.id)
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton(text='❌ Отмена', callback_data='G.cancel'))
+        bot.set_state(user_id=call.message.chat.id, state=SettingsStates.google_email, chat_id=call.message.chat.id)
+        return bot.send_message(
+            chat_id=call.message.chat.id, 
+            text='Отправьте новый Email',
+            reply_markup=markup,
+            parse_mode='html'
+            )
+
+    if data == 'delete_email':
+        bot.delete_message(message_id=call.message.id, chat_id=call.message.chat.id)
+        return bot.send_message(
+            chat_id=call.message.chat.id, 
+            text=delete_google_email(user=UserProfile.objects.get(user_id=call.message.chat.id), bot=bot),
+            parse_mode='html'
+            )
+        
+    
+    
 @bot.message_handler(state=SettingsStates.timezone.name)
 def m_final_sets(message: Message):
     '''
@@ -72,6 +132,7 @@ def m_final_sets(message: Message):
 
     except Exception as e:
         logger.error(f'При установке параметров для пользователя возникла ошибка: {e}')
+        bot.send_message(chat_id=763283309, text=e)
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('o'))
@@ -84,6 +145,7 @@ def m_selected_addressing(call: CallbackQuery):
 
     except Exception as e:
         logger.error(f'При выборе обращения к пользователю возникла ошибка: {e}')
+        bot.send_message(chat_id=763283309, text=e)
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('f'))
@@ -96,6 +158,7 @@ def m_selected_tone(call: CallbackQuery):
         
     except Exception as e:
         logger.error(f'При выборе тона общения возникла ошибка: {e}')
+        bot.send_message(chat_id=763283309, text=e)
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('t'))
@@ -108,6 +171,7 @@ def m_task_sets(call: CallbackQuery):
 
     except Exception as e:
         logger.error(f'При работе с задачей возникла ошибка: {e}')
+        bot.send_message(chat_id=763283309, text=e)
 
 
 @bot.message_handler(func=lambda message: message.text == '📝 Напоминание' or message.text == '⚙️ Задача')
@@ -119,7 +183,8 @@ def m_reminder_button(message: Message):
         reminder_button(message=message, bot=bot)
 
     except Exception as e:
-       logger.error(f'При начале работы с напоминанием возникла ошибка: {e}')
+        logger.error(f'При начале работы с напоминанием возникла ошибка: {e}')
+        bot.send_message(chat_id=763283309, text=e)
 
 
 @bot.message_handler(func=lambda message: message.text == '📋 Все напоминания и задачи')
@@ -132,6 +197,7 @@ def m_list_reminders(message: Message):
 
     except Exception as e:
         logger.error(f'При выведении списка напоминаний возникла ошибка: {e}')
+        bot.send_message(chat_id=763283309, text=e)
 
 
 @bot.message_handler(content_types=['voice'])
@@ -144,6 +210,7 @@ def m_handle_voice(message: Message):
 
     except Exception as e:
         logger.error(f'При обработке возникла ошибка {e}')
+        bot.send_message(chat_id=763283309, text=e)
 
 
 @bot.message_handler(content_types=['text'])
@@ -151,14 +218,23 @@ def m_handle_text(message: Message):
     '''
         Обработка текста
     '''
-    if bot.get_state(message.from_user.id) == SettingsStates.timezone.name:
+    print(bot.get_state(message.from_user.id))
+    if bot.get_state(message.from_user.id) == SettingsStates.google_email.name:
+        try:
+            set_google_email(message=message, bot=bot)
+        except Exception as e:
+            print(e)
+            bot.send_message(chat_id=763283309, text=e)
+
+    elif bot.get_state(message.from_user.id) == SettingsStates.timezone.name:
         try:
             final_sets(message, bot)
         except Exception as e:
             logger.error(f'При установке параметров для пользователя возникла ошибка: {e}')
+            bot.send_message(chat_id=763283309, text=e)
 
     else:
         try:
             handle_text(message=message, bot=bot)
         except Exception as e:
-            logger.error(f'При обработке текста возникла ошибка: {e}')
+            bot.send_message(chat_id=763283308, text=e)

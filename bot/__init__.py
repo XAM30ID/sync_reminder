@@ -21,6 +21,7 @@ class SettingsStates(StatesGroup):
     addressing = State()
     tone = State()
     timezone = State()
+    google_email = State()
 
 # Установка комманд для бота
 bot.set_my_commands(commands)

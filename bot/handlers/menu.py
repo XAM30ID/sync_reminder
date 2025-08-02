@@ -4,11 +4,10 @@ from telebot import TeleBot
 
 from ..models import UserProfile
 from bot import SettingsStates
-from .ai import OpenAIAPI
 
 start_markup = InlineKeyboardMarkup()
 start_markup.add(InlineKeyboardButton(text='На ты', callback_data='o.ty'))
-start_markup.add(InlineKeyboardButton(text='На Вы', callback_data='o.vy'))
+start_markup.add(InlineKeyboardButton(text='На вы', callback_data='o.vy'))
 
 main_markup = ReplyKeyboardMarkup(resize_keyboard=True)
 main_markup.add(KeyboardButton(text='📝 Напоминание'))
@@ -19,6 +18,29 @@ def cmd_start(message: Message, bot: TeleBot):
     """
         Обработчик команды /start
     """
+    if UserProfile.objects.filter(user_id=message.from_user.id).exists():
+        return bot.send_message(
+                chat_id=message.chat.id,
+                text=f"👋 Привет! Я бот для создания напоминаний.\n\n"
+                f"Теперь я понимаю много новых форматов:\n\n"
+                f"📅 **Относительные даты:**\n"
+                f"• 'завтра в 8:30 выпить витамины'\n"
+                f"• 'послезавтра в 14:00 встреча'\n\n"
+                f"📆 **Дни недели:**\n"
+                f"• 'в субботу в 10:00 уборка'\n"
+                f"• 'в понедельник в 9:00 работа'\n\n"
+                f"🔄 **Циклические напоминания:**\n"
+                f"• 'каждый день в 22:00 витамины'\n"
+                f"• 'каждый понедельник в 8:00 спорт'\n"
+                f"• 'каждое утро зарядка'\n"
+                f"• 'каждый вечер прогулка'\n\n"
+                f"⏰ **Обычные форматы:**\n"
+                f"• 'через 2 часа сделать зарядку'\n"
+                f"• 'в 15:30 позвонить маме'",
+                reply_markup=main_markup,
+                parse_mode="Markdown"
+            ) 
+    
     bot.set_state(message.from_user.id, SettingsStates.addressing, message.chat.id)
     return bot.send_message(
         chat_id=message.chat.id,
@@ -27,6 +49,25 @@ def cmd_start(message: Message, bot: TeleBot):
         reply_markup=start_markup,
         parse_mode="Markdown"
     ) 
+
+
+def cmd_setting(message: Message, bot: TeleBot):
+    """
+        Обработчик команды /setting
+    """
+    bot.set_state(message.from_user.id, SettingsStates.addressing, message.chat.id)
+    return bot.send_message(
+        chat_id=message.chat.id,
+        text=f"Для начала, как мне стоит обращаться к тебе?\n\n",
+        reply_markup=start_markup,
+        parse_mode="Markdown"
+    ) 
+    
+    
+ADDRESSINGS = {
+    'ty': 'ты',
+    'vy': 'вы',
+}
 
 
 def selected_addressing(call: CallbackQuery, bot: TeleBot):
@@ -45,7 +86,7 @@ def selected_addressing(call: CallbackQuery, bot: TeleBot):
         return bot.edit_message_text(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
-            text=f'Отлично! Я буду обращаться на {addressing}.\n\n'
+            text=f'Отлично! Я буду обращаться на {ADDRESSINGS[addressing]}.\n\n'
             f'Теперь нужно выбрать тон общения:',
             reply_markup=communication_markup
         )
