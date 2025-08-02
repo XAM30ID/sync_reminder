@@ -5,27 +5,12 @@ from datetime import datetime
 
 import dotenv
 import openai
-from ..utils.timezone import get_now, format_moscow_time
+
 
 dotenv.load_dotenv()
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-def get_current_datetime_info():
-    """Получает текущую дату и время для ИИ"""
-    now = get_now()
-    weekdays = ['понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота', 'воскресенье']
-    current_weekday = weekdays[now.weekday()]
-    
-    return f"""
-ТЕКУЩАЯ ДАТА И ВРЕМЯ (Москва):
-- Дата: {now.strftime('%d.%m.%Y')}
-- Время: {now.strftime('%H:%M')}
-- День недели: {current_weekday}
-- Полная дата: {format_moscow_time(now)}
-
-ВАЖНО: Используй эту информацию для правильного вычисления относительных дат!
-"""
 
 ASSISTANT_PROMPT = """Ты - ИИ-помощник бота для напоминаний и задач. Твоя задача - анализировать сообщения пользователей и определять, хочет ли пользователь:
 1. Создать напоминание 

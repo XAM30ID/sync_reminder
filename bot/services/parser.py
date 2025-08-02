@@ -2,8 +2,8 @@ from datetime import datetime, timedelta
 import dateparser
 import re
 from ..utils.timezone import get_now
-from django.utils import timezone
 
+from django.utils import timezone
 
 def normalize_time_string(text: str) -> str:
     """
@@ -193,6 +193,7 @@ def extract_time_and_text(text: str) -> tuple[str, str, str]:
             # Дополнительно очищаем текст от артефактов
             reminder_text = clean_reminder_text(reminder_text, time_str)
             return time_str, reminder_text, repeat_type
+    
     return None, text, repeat_type
 
 def parse_reminder_time(text: str, user) -> tuple[datetime, datetime, str, str]:
@@ -399,7 +400,9 @@ def parse_reminder_time(text: str, user) -> tuple[datetime, datetime, str, str]:
                         reminder_time = target_date.replace(hour=9, minute=0, second=0, microsecond=0)
     
     # Обычный парсинг времени (только если время еще не установлено)
-    if not reminder_time:        
+    if not reminder_time:
+        print(time_str)
+        
         if user.pk:
             utc_offset = int(user.timezone[1:])
         else:
@@ -440,15 +443,14 @@ def parse_reminder_time(text: str, user) -> tuple[datetime, datetime, str, str]:
     if not reminder_time:
         return None, None, text, None
     
-    # Создаем время для предварительного напоминания (за 15 минут)
-    pre_reminder_time = reminder_time - timedelta(minutes=15)
-        
     if user.pk:
         utc_offset = int(user.timezone[1:])
     else:
         utc_offset = 3
     offset = timedelta(hours=utc_offset)
     custom_timezone = timezone.get_fixed_timezone(offset=offset)
+    # Создаем время для предварительного напоминания (за 15 минут)
+    pre_reminder_time = reminder_time - timedelta(minutes=15)
     return timezone.make_naive(reminder_time, timezone=custom_timezone), timezone.make_naive(pre_reminder_time, timezone=custom_timezone), reminder_text, repeat_type
 
 def clean_reminder_text(text: str, time_str: str) -> str:
@@ -561,7 +563,7 @@ def parse_date_query(query_text: str, user):
     Возвращает дату в формате 'YYYY-MM-DD' или None
     """
     query_lower = query_text.lower().strip()
-    current_time = get_now(user=user)
+    current_time = get_now(user)
     
     # Сегодня
     if any(word in query_lower for word in ['сегодня', 'сегодняшние', 'на сегодня']):
