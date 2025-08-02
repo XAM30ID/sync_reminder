@@ -6,7 +6,7 @@ import re, os
 from telebot.types import KeyboardButton, ReplyKeyboardMarkup, CallbackQuery, Message, InlineKeyboardMarkup, InlineKeyboardButton
 from telebot import TeleBot
 
-from main import settings
+from main.settings import BASE_DIR
 from bot import SettingsStates
 from ..models import UserProfile
 
@@ -130,7 +130,7 @@ def delete_google_email(user: UserProfile, bot: TeleBot):
 from googleapiclient.errors import HttpError
 
 # Конфигурация
-SERVICE_ACCOUNT_FILE = 'service-account.json'  # Файл ключа сервисного аккаунта
+SERVICE_ACCOUNT_FILE = os.path.join(BASE_DIR, 'service-account.json')  # Файл ключа сервисного аккаунта
 USER_EMAIL = 'khamzavaliev@gmail.com'  # Почта пользователя (должна быть предварительно настроена)
 
 def add_event(date=datetime.now(), title='Напоминание', description=None):

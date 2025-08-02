@@ -15,3 +15,4 @@ migrations
 */*/migrations
 main/settings.py
 bot/handlers/service-account.json
+service-account.json
