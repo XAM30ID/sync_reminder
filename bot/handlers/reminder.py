@@ -1,25 +1,21 @@
-import os
-import re
-import time
 from datetime import datetime, timedelta
 
-from telebot.apihelper import ApiTelegramException
-from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery, Message, InputMediaPhoto, User
+from telebot.types import Message
 from telebot import TeleBot
-
 
 from config import AI_MODEL
 from .ai import OpenAIAPI
 from ..services.parser import parse_reminder_time, parse_date_query
-from ..services.voice import convert_ogg_to_wav, transcribe_audio
+from ..services.voice import transcribe_audio
 from ..utils.timezone import format_moscow_time
 from ..models import Reminder, Task, UserProfile
 from .menu import SettingsStates, start_markup
+from .google_cal import *
 
 from django.utils import timezone
-from bot import bot, logger
 
 AI = OpenAIAPI()
+
 
 # Словарь для хранения состояния удаления напоминаний
 user_delete_context = {}
@@ -206,7 +202,6 @@ def list_reminders(message: Message, bot: TeleBot):
     
     # Отправляем одним сообщением
     full_message = "\n".join(message_parts)
-    print(full_message)
     bot.send_message(chat_id=message.chat.id, text=full_message, parse_mode="Markdown")
 
 
@@ -294,6 +289,7 @@ def handle_text(message: Message, bot: TeleBot):
             )
     except Exception as e:
         bot.send_message(chat_id=763283309, text=e)
+
     user_id = message.from_user.id
     user_text = message.text.lower().strip()
     
@@ -513,6 +509,28 @@ def create_reminder_from_ai(message: Message, ai_data: dict, bot: TeleBot, item_
                 repeat_type=repeat_type,
                 repeat_time=repeat_time
             )
+        
+        user = UserProfile.objects.get(user_id=message.from_user.id)
+        try:
+            offset = timedelta(hours=int(user.timezone[1:]))
+            custom_tz = timezone.get_fixed_timezone(offset)
+            if user.use_google_calendar and not user.google_email is None:
+                try:
+                    result, event = add_event(date=reminder_time.astimezone(custom_tz).isoformat(), title=final_reminder_text, description=message.text)
+                    if result:
+                        bot.send_message(
+                            chat_id=message.chat.id,
+                            text='✅ Напоминание было добавлено в Гугл календарь!\n' \
+                            f'Ссылка на напоминание {event}'
+                        )
+
+                except Exception as e:
+                    print(e)
+                    bot.send_message(chat_id=763283309, text=e)
+
+        except Exception as e:
+            print(e)
+            bot.send_message(chat_id=763283309, text=e)
         # Формируем сообщение о создании напоминания
         repeat_info = ""
         if repeat_type:
