@@ -24,10 +24,10 @@ def send_reminders():
         Функция отправки всех напоминаний, включая задачи
     '''
 
-    pre_reminders = Reminder.objects.filter(reminder_time__lte=timezone.now() - datetime.timedelta(minutes=15), is_pre_reminder_sent=False) | \
+    pre_reminders = Reminder.objects.filter(pre_reminder_time__lte=timezone.now(), is_pre_reminder_sent=False) | \
                     Reminder.objects.filter(~Q(repeat_type=None), ~Q(repeat_time=None), repeat_time__lte=timezone.now() - datetime.timedelta(minutes=15), is_pre_reminder_sent=False)
     
-    pre_tasks = Task.objects.filter(reminder_time__lte=timezone.now() - datetime.timedelta(minutes=15), is_pre_reminder_sent=False) | \
+    pre_tasks = Task.objects.filter(pre_reminder_time__lte=timezone.now(), is_pre_reminder_sent=False) | \
                 Task.objects.filter(~Q(repeat_type=None), ~Q(repeat_time=None), repeat_time__lte=timezone.now() - datetime.timedelta(minutes=15), is_pre_reminder_sent=False)
     
     reminders = Reminder.objects.filter(reminder_time__lte=timezone.now(), is_main_reminder_sent=False) | \

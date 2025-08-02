@@ -34,11 +34,13 @@ ALLOWED_HOSTS = ['*']
 
 # Настройки бота
 BOT_TOKEN = os.getenv('BOT_TOKEN')
-HOOK = 'https://jdv1i7-176-52-15-111.ru.tuna.am'
+HOOK = os.getenv('HOOK')
 OWNER_ID = os.getenv('OWNER_ID')
 BOT_NAME = 'Тоби'
 BOT_COMMANDS = [
-    BotCommand("start", "Старт"),
+    BotCommand("start", "⏩ Старт"),
+    BotCommand("setting", "⚙️ Настроить общение"),
+    BotCommand("google_calendar", "🔃 Настроить google-календарь"),
 ]
 
 REMINDER_CHECK_INTERVAL = 60
@@ -47,13 +49,13 @@ REMINDER_CHECK_INTERVAL = 60
 # Application definition
 
 INSTALLED_APPS = [
-    'bot',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'bot'
 ]
 
 MIDDLEWARE = [
@@ -89,6 +91,10 @@ WSGI_APPLICATION = 'main.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# LOCAL = os.getenv("LOCAL")
+LOCAL = False
+
+# if LOCAL:
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -96,6 +102,16 @@ DATABASES = {
     }
 }
 
+# else:
+#     DATABASES = {
+#         "default": {
+#             "ENGINE": "django.db.backends.mysql",
+#             "NAME": os.getenv("NAME_DB"),
+#             "USER": os.getenv("NAME_DB"),
+#             "PASSWORD": os.getenv("PASS_DB"),
+#             "HOST": "127.0.0.1",
+#         }
+#     }
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
