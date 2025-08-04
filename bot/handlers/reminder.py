@@ -511,18 +511,16 @@ def create_reminder_from_ai(message: Message, ai_data: dict, bot: TeleBot, item_
             )
         
         user = UserProfile.objects.get(user_id=message.from_user.id)
+        googl_added = ''
+
         try:
             offset = timedelta(hours=int(user.timezone[1:]))
             custom_tz = timezone.get_fixed_timezone(offset)
             if user.use_google_calendar and not user.google_email is None:
                 try:
-                    result, event = add_event(date=reminder_time.astimezone(custom_tz).isoformat(), title=final_reminder_text, description=message.text)
+                    result, event = add_event(email=user.google_email, date=reminder_time.astimezone(custom_tz).isoformat(), title=final_reminder_text, description=message.text)
                     if result:
-                        bot.send_message(
-                            chat_id=message.chat.id,
-                            text='✅ Напоминание было добавлено в Гугл календарь!\n' \
-                            f'Ссылка на напоминание {event}'
-                        )
+                        googl_added = '🔄️ Событие добавлено в Гугл календарь'
 
                 except Exception as e:
                     print(e)
@@ -539,21 +537,18 @@ def create_reminder_from_ai(message: Message, ai_data: dict, bot: TeleBot, item_
             elif repeat_type == 'weekly':
                 repeat_info = "\n🔄 Тип: каждую неделю"
         if reminder_type == 'task':
-            bot.send_message(
-                chat_id=message.chat.id,
-                text=f"✅ Задача установлена!\n"
-                f"📝 Текст: {final_reminder_text}\n"
-                f"🕐 Время: {format_moscow_time(reminder_time)}\n"
-                f"⏰ Предварительное напоминание: {format_moscow_time(pre_reminder_time)}{repeat_info}"
-            )
+            rem_type = '✅ Задача установлена!\n'
         else:
-            bot.send_message(
-                chat_id=message.chat.id,
-                text=f"✅ Напоминание установлено!\n"
-                f"📝 Текст: {final_reminder_text}\n"
-                f"🕐 Время: {format_moscow_time(reminder_time)}\n"
-                f"⏰ Предварительное напоминание: {format_moscow_time(pre_reminder_time)}{repeat_info}"
-            )
+            rem_type = '✅ Напоминание установлено!\n'
+            
+        bot.send_message(
+            chat_id=message.chat.id,
+            text=f"{rem_type}"
+            f"📝 Текст: {final_reminder_text}\n"
+            f"🕐 Время: {format_moscow_time(reminder_time)}\n"
+            f"⏰ Предварительное напоминание: {format_moscow_time(pre_reminder_time)}{repeat_info}\n"
+            f"{googl_added}"
+        )
         return True
     except Exception as e:
         print(f"Error creating reminder: {e}")

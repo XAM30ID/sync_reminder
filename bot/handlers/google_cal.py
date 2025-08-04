@@ -22,11 +22,15 @@ def start_google(message: Message, bot: TeleBot):
         if user.google_email is None and user.google_email == '':
             markup.add(InlineKeyboardButton(text='❌ Отмена', callback_data='G.cancel'))
             bot.set_state(user_id=message.from_user.id, state=SettingsStates.google_email, chat_id=message.chat.id)
-            return bot.send_message(
+            return bot.send_photo(
                 chat_id=message.chat.id, 
-                text='Для работы с Гугл календарём, Вам нужно дать доступ к календарю этому аккаунту:\n' \
+                photo=open(os.path.join(BASE_DIR, 'images', 'tutorial', 'giving_accept.jpg'), 'rb'),
+                caption='Для работы с Гугл календарём, Вам нужно:\n' \
+                '❕ 1. Дать доступ к календарю этому аккаунту:\n' \
                 '<code>reminderbot@remindercalendar.iam.gserviceaccount.com</code>\n' \
-                'Это сервисный аккаунт, который будет вносить напоминания в Ваш календарь, а так же, нужно отправить Email аккаунта, с чьим календарём необходимо будет работать.',
+                'Это сервисный аккаунт, который будет вносить напоминания в Ваш календарь\n' \
+                '(Дать доступ можно следующим образом: <strong><a href="https://calendar.google.com/">Перейти в Google Calendar</a> ⇒ 🔵 Настройки ⇒ 🟣 Выбор календаря ⇒ Имеют доступ ⇒ 🟢 Добавить пользователей или группы ⇒ 🟠 Ввести почту выше и дать права на изменение мероприятий</strong>)\n\n' \
+                '❕ 2. Отправить Gmail аккаунта.\n',
                 reply_markup=markup,
                 parse_mode='html'
                 )
@@ -57,11 +61,15 @@ def start_google(message: Message, bot: TeleBot):
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton(text='❌ Отмена', callback_data='G.cancel'))
     bot.set_state(user_id=message.from_user.id, state=SettingsStates.google_email, chat_id=message.chat.id)
-    return bot.send_message(
+    return bot.send_photo(
         chat_id=message.chat.id, 
-        text='Для работы с Гугл календарём, Вам нужно дать доступ к календарю этому аккаунту (Это можно сделать в настройках календаря):\n' \
-        '<code>reminderbot@remindercalendar.iam.gserviceaccount.com</code>\n' \
-        'Это сервисный аккаунт, который будет вносить напоминания в Ваш календарь, а так же, нужно отправить Email аккаунта, с чьим календарём необходимо будет работать.',
+        photo=open(os.path.join(BASE_DIR, 'images', 'tutorial', 'giving_accept.jpg'), 'rb'),
+        caption='Для работы с Гугл календарём, Вам нужно:\n' \
+        '❕ 1. Дать доступ к календарю этому аккаунту:\n' \
+        '<code>reminderbot@remindercalendar.iam.gserviceaccount.com</code>\n\n' \
+        'Это сервисный аккаунт, который будет вносить напоминания в Ваш календарь\n\n' \
+        'Дать доступ можно следующим образом:\n <strong><a href="https://calendar.google.com/">Перейти в Google Calendar</a> ⇒ 🔵 Настройки ⇒ 🟣 Выбор календаря ⇒ Имеют доступ ⇒ 🟢 Добавить пользователей или группы ⇒ 🟠 Ввести почту выше и дать права на изменение мероприятий</strong>\n\n' \
+        '❕ 2. Отправить Gmail аккаунта.\n',
         reply_markup=markup,
         parse_mode='html'
         )
@@ -131,9 +139,8 @@ from googleapiclient.errors import HttpError
 
 # Конфигурация
 SERVICE_ACCOUNT_FILE = os.path.join(BASE_DIR, 'service-account.json')  # Файл ключа сервисного аккаунта
-USER_EMAIL = 'khamzavaliev@gmail.com'  # Почта пользователя (должна быть предварительно настроена)
 
-def add_event(date=datetime.now(), title='Напоминание', description=None):
+def add_event(email, date=datetime.now(), title='Напоминание', description=None):
     try:
         # Создаем учетные данные сервисного аккаунта
         credentials = service_account.Credentials.from_service_account_file(
@@ -154,7 +161,7 @@ def add_event(date=datetime.now(), title='Напоминание', description=N
         
         # Добавляем событие
         event = service.events().insert(
-            calendarId=USER_EMAIL,  # Используем email как calendar ID
+            calendarId=email,  # Используем email как calendar ID
             sendNotifications=True,
             body=event
         ).execute()
