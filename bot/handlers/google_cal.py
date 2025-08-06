@@ -6,6 +6,8 @@ import re, os
 from telebot.types import KeyboardButton, ReplyKeyboardMarkup, CallbackQuery, Message, InlineKeyboardMarkup, InlineKeyboardButton
 from telebot import TeleBot
 
+from django.utils import timezone
+
 from main.settings import BASE_DIR
 from bot import SettingsStates
 from ..models import UserProfile
@@ -79,15 +81,14 @@ def set_google_email(message: Message, bot: TeleBot):
     markup = InlineKeyboardMarkup()
     if '@' in message.text and message.text.split('@')[0].count(' ') == 0 and re.fullmatch(r'\S+.\S', message.text.split('@')[1]):
         is_accepted = False
-        try:
-            event = add_event(email=message.text, date=datetime.now(), title='Проверка доступа', description='Проверка доступа')
-            if event[0]:
-                delete_event(email=message.text, event_id=event[1])
+        offset = timedelta(hours=int(user.timezone[1:]))
+        custom_tz = timezone.get_fixed_timezone(offset)
+        event = add_event(email=message.text, date=datetime.now().astimezone(custom_tz).isoformat(), title='Проверка доступа', description='Проверка доступа')
+        if event[0]:
+            delete_event(email=message.text, event_id=event[1])
             is_accepted = True
 
-        except Exception as e:
-            is_accepted = False
-            print(e)
+        print(is_accepted)
 
         if is_accepted:
             try:
