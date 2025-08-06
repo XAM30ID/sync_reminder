@@ -69,7 +69,7 @@ def start_google(message: Message, bot: TeleBot):
         '<code>reminderbot@remindercalendar.iam.gserviceaccount.com</code>\n\n' \
         'Это сервисный аккаунт, который будет вносить напоминания в Ваш календарь\n\n' \
         'Дать доступ можно следующим образом:\n <strong><a href="https://calendar.google.com/">Перейти в Google Calendar</a> ⇒ 🔵 Настройки ⇒ 🟣 Выбор календаря ⇒ Имеют доступ ⇒ 🟢 Добавить пользователей или группы ⇒ 🟠 Ввести почту выше и дать права на изменение мероприятий</strong>\n\n' \
-        '❕ 2. Отправить Gmail аккаунта.\n',
+        '❕ 2. Отправить Gmail сюда.\n',
         reply_markup=markup,
         parse_mode='html'
         )
@@ -78,20 +78,51 @@ def set_google_email(message: Message, bot: TeleBot):
     user = UserProfile.objects.get(user_id=message.from_user.id)
     markup = InlineKeyboardMarkup()
     if '@' in message.text and message.text.split('@')[0].count(' ') == 0 and re.fullmatch(r'\S+.\S', message.text.split('@')[1]):
-        bot.delete_state(user_id=message.from_user.id, chat_id=message.chat.id)
-        user.google_email = message.text
-        user.use_google_calendar = True
-        user.save()
-        markup.add(ON_OFF_BUTTONS[user.use_google_calendar])
-        return bot.send_message(
-            chat_id=message.chat.id, 
-            text=f'✅ Отлично! Вы поставили email <strong>{message.text}</strong>.\n' \
-            'Не забудьте дать доступ к календарю этому аккаунту:\n' \
-            '<code>reminderbot@remindercalendar.iam.gserviceaccount.com</code>\n' \
-            'Это сервисный аккаунт, который будет вносить напоминания в Ваш календарь.',
-            reply_markup=markup,
-            parse_mode='html'
-            )
+        is_accepted = False
+        try:
+            event = add_event(email=message.text, date=datetime.now(), title='Проверка доступа', description='Проверка доступа')
+            if event[0]:
+                delete_event(email=message.text, event_id=event[1])
+            is_accepted = True
+
+        except Exception as e:
+            is_accepted = False
+            print(e)
+
+        if is_accepted:
+            try:
+                bot.delete_message(chat_id=message.chat.id, message_id=message.message_id - 1)
+            except:
+                pass
+            bot.delete_state(user_id=message.from_user.id, chat_id=message.chat.id)
+            user.google_email = message.text
+            user.use_google_calendar = True
+            user.save()
+            markup.add(ON_OFF_BUTTONS[user.use_google_calendar])
+            return bot.send_message(
+                chat_id=message.chat.id, 
+                text=f'✅ Отлично! Вы поставили email <strong>{message.text}</strong>.\n' \
+                'Не забудьте дать доступ к календарю этому аккаунту:\n' \
+                '<code>reminderbot@remindercalendar.iam.gserviceaccount.com</code>\n' \
+                'Это сервисный аккаунт, который будет вносить напоминания в Ваш календарь.',
+                reply_markup=markup,
+                parse_mode='html'
+                )
+        else:
+            try:
+                bot.delete_message(chat_id=message.chat.id, message_id=message.message_id - 1)
+            except:
+                pass
+            markup = InlineKeyboardMarkup()
+            markup.add(InlineKeyboardButton(text='❌ Отмена', callback_data='G.cancel'))
+            return bot.send_message(
+                chat_id=message.chat.id, 
+                text=f'❗Не удалось получить доступ к календарю.' \
+                '\nПроверьте права на изменение мероприятий у пользователя <code>reminderbot@remindercalendar.iam.gserviceaccount.com</code> и отправьте Gmail заново',
+                reply_markup=markup,
+                parse_mode='html'
+                )
+
     
     markup.add(InlineKeyboardButton(text='❌ Отмена', callback_data='G.cancel'))
     return bot.send_message(
@@ -167,8 +198,33 @@ def add_event(email, date=datetime.now(), title='Напоминание', descri
         ).execute()
         
         print(f'Событие создано! Ссылка: {event.get("htmlLink")}')
-        return (True, event.get("htmlLink"))
+        print(event)
+        return (True, event)
         
     except HttpError as error:
         print(f'Ошибка API: {error}')
         return (False, None)
+
+
+def delete_event(email, event_id):
+    try:
+        # Создаем учетные данные сервисного аккаунта
+        credentials = service_account.Credentials.from_service_account_file(
+            SERVICE_ACCOUNT_FILE,
+            scopes=['https://www.googleapis.com/auth/calendar']
+        )
+        
+        # Создаем сервис
+        service = build('calendar', 'v3', credentials=credentials)
+        
+
+        # Добавляем событие
+        service.events().delete(
+            calendarId=email,  # Используем email как calendar ID
+            eventId=event_id,
+        ).execute()
+        return True
+        
+    except HttpError as error:
+        print(f'Ошибка API: {error}')
+        return False
