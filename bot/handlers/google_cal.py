@@ -103,9 +103,7 @@ def set_google_email(message: Message, bot: TeleBot):
             return bot.send_message(
                 chat_id=message.chat.id, 
                 text=f'✅ Отлично! Вы поставили email <strong>{message.text}</strong>.\n' \
-                'Не забудьте дать доступ к календарю этому аккаунту:\n' \
-                '<code>reminderbot@remindercalendar.iam.gserviceaccount.com</code>\n' \
-                'Это сервисный аккаунт, который будет вносить напоминания в Ваш календарь.',
+                'Теперь Ваши напоминания смогут сохранятся в Гугл календаре!',
                 reply_markup=markup,
                 parse_mode='html'
                 )
