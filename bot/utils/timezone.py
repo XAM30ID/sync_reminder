@@ -6,7 +6,7 @@ from ..models import UserProfile
 
 def get_now(user: UserProfile=None) -> datetime:
     """Получить текущее время в московском часовом поясе без timezone info"""
-    if user.pk:
+    if user:
         utc_offset = int(user.timezone[1:])
     else:
         utc_offset = 3

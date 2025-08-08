@@ -222,7 +222,7 @@ def parse_reminder_time(text: str, user) -> tuple[datetime, datetime, str, str]:
             target_date = now + timedelta(days=number)
             
             # Парсим указанное время
-            if user.pk:
+            if user:
                 utc_offset = int(user.timezone[1:])
             else:
                 utc_offset = 3
@@ -263,7 +263,7 @@ def parse_reminder_time(text: str, user) -> tuple[datetime, datetime, str, str]:
                 time_match = re.search(r'в\s*(\d{1,2}(?::\d{2})?\s*(?:am|pm|утра|вечера|дня|ночи)?)', time_str)
                 if time_match:
                     time_part = time_match.group(1)
-                    if user.pk:
+                    if user:
                         utc_offset = int(user.timezone[1:])
                     else:
                         utc_offset = 3
@@ -309,7 +309,7 @@ def parse_reminder_time(text: str, user) -> tuple[datetime, datetime, str, str]:
         time_match = re.search(r'(\d{1,2}(?::\d{2})?\s*(?:am|pm|утра|вечера|дня|ночи)?)', time_str)
         if time_match:
             time_part = time_match.group(1)
-            if user.pk:
+            if user:
                 utc_offset = int(user.timezone[1:])
             else:
                 utc_offset = 3
@@ -401,9 +401,8 @@ def parse_reminder_time(text: str, user) -> tuple[datetime, datetime, str, str]:
     
     # Обычный парсинг времени (только если время еще не установлено)
     if not reminder_time:
-        print(time_str)
         
-        if user.pk:
+        if user:
             utc_offset = int(user.timezone[1:])
         else:
             utc_offset = 3
@@ -443,7 +442,7 @@ def parse_reminder_time(text: str, user) -> tuple[datetime, datetime, str, str]:
     if not reminder_time:
         return None, None, text, None
     
-    if user.pk:
+    if user:
         utc_offset = int(user.timezone[1:])
     else:
         utc_offset = 3

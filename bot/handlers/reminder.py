@@ -234,8 +234,8 @@ def handle_voice(message: Message, bot: TeleBot):
         
         addressing = None
         tone = None
-        user_info = UserProfile.objects.get(user_id=message.from_user.id)
-        if user_info.pk:
+        user_info = UserProfile.objects.filter(user_id=message.from_user.id).first()
+        if user_info:
             utc_info = user_info.timezone
             addressing = user_info.addressing
             tone = user_info.tone
@@ -363,8 +363,8 @@ def handle_text(message: Message, bot: TeleBot):
             
         addressing = None
         tone = None
-        user_info = UserProfile.objects.get(user_id=message.from_user.id)
-        if user_info.pk:
+        user_info = UserProfile.objects.filter(user_id=message.from_user.id).first()
+        if user_info:
             addressing = user_info.addressing
             tone = user_info.tone
         # Получаем ответ от ИИ
@@ -464,8 +464,8 @@ def create_reminder_from_ai(message: Message, ai_data: dict, bot: TeleBot, item_
         print(f"final_reminder_text: '{final_reminder_text}'")
         print(f"reminder_time: {reminder_time}")
         print("=======================")
-        user = UserProfile.objects.get(user_id=message.from_user.id)
-        if user.pk:
+        user = UserProfile.objects.filter(user_id=message.from_user.id).first()
+        if user:
             utc_offset = int(user.timezone[1:])
         else:
             utc_offset = 3
@@ -574,8 +574,8 @@ def handle_delete_reminder_from_ai(message: Message, ai_data: dict, bot: TeleBot
             return False
         
         # Сначала пытаемся найти по дате
-        user = UserProfile.objects.get(user_id=message.from_user.id)
-        if user.pk:
+        user = UserProfile.objects.filter(user_id=message.from_user.id).first()
+        if user:
             custom_delta = int(user.timezone[1:])
         else:
             custom_delta = 3
