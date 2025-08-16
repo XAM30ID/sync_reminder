@@ -471,8 +471,10 @@ def create_reminder_from_ai(message: Message, ai_data: dict, bot: TeleBot, item_
             utc_offset = 3
         offset = timedelta(hours=utc_offset)
         custom_timezone = timezone.get_fixed_timezone(offset=offset)
-        aware_reminder_time = timezone.make_aware(reminder_time, timezone=custom_timezone)
-        aware_pre_reminder_time = timezone.make_aware(pre_reminder_time, timezone=custom_timezone)
+        # aware_reminder_time = timezone.make_aware(timezone.make_naive(reminder_time, timezone=custom_timezone), timezone=custom_timezone)
+        # aware_pre_reminder_time = timezone.make_aware(timezone.make_naive(pre_reminder_time, timezone=custom_timezone), timezone=custom_timezone)
+        aware_reminder_time = reminder_time
+        aware_pre_reminder_time = pre_reminder_time
         created_time = timezone.make_aware(datetime.now(), timezone=custom_timezone)
 
         # Добавляем напоминание в базу, используя короткое название от ИИ

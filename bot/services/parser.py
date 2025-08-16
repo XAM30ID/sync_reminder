@@ -148,6 +148,14 @@ def extract_time_and_text(text: str) -> tuple[str, str, str]:
     
     # Паттерны для поиска времени и дат
     time_patterns = [
+        # Обычные даты с временем (например, "20 августа в 10:00", "15.01 в 14:30")
+        r'(\d{1,2}\s+(?:января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря))\s+(?:в\s*)?(\d{1,2}(?::\d{2})?\s*(?:am|pm|утра|вечера|дня|ночи)?)',
+        r'(\d{1,2}\.(?:\d{1,2})(?:\.\d{2,4})?)\s+(?:в\s*)?(\d{1,2}(?::\d{2})?\s*(?:am|pm|утра|вечера|дня|ночи)?)',
+        r'(\d{1,2}/(?:\d{1,2})(?:/\d{2,4})?)\s+(?:в\s*)?(\d{1,2}(?::\d{2})?\s*(?:am|pm|утра|вечера|дня|ночи)?)',
+        # Обычные даты без времени (например, "20 августа", "15.01")
+        r'(\d{1,2}\s+(?:января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря))',
+        r'(\d{1,2}\.(?:\d{1,2})(?:\.\d{2,4})?)',
+        r'(\d{1,2}/(?:\d{1,2})(?:/\d{2,4})?)',
         # Относительные даты с временем (например, "через 3 дня в 09:00")
         r'через (\d+)\s*(минут|час[ао]?в?|дн[ейяи]|день|дня|дни)\s*(?:в\s*)?(\d{1,2}(?::\d{2})?\s*(?:am|pm|утра|вечера|дня|ночи)?)',
         # Дни недели с временными указаниями - самый специфичный паттерн должен быть первым
@@ -187,7 +195,11 @@ def extract_time_and_text(text: str) -> tuple[str, str, str]:
             normalized_text = 'через 1 час'
         match = re.search(pattern, normalized_text, re.IGNORECASE)
         if match:
-            time_str = match.group(0)
+            # Для паттернов с группами захвата используем group(0), для остальных - весь матч
+            if '(' in pattern:
+                time_str = match.group(0)
+            else:
+                time_str = match.group(0)
             # Удаляем найденное время из текста и очищаем от лишних пробелов
             reminder_text = re.sub(pattern, '', normalized_text, 1).strip()
             # Дополнительно очищаем текст от артефактов
@@ -399,9 +411,115 @@ def parse_reminder_time(text: str, user) -> tuple[datetime, datetime, str, str]:
                         # Если время не указано, устанавливаем на 9:00
                         reminder_time = target_date.replace(hour=9, minute=0, second=0, microsecond=0)
     
+    # Обработка обычных дат (например, "20 августа", "15.01")
+    if not reminder_time:
+        # Паттерн для дат вида "15 января" или "15.01"
+        date_patterns = [
+            r'(\d{1,2})\s+(января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)',
+            r'(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?',
+            r'(\d{1,2})/(\d{1,2})(?:/(\d{2,4}))?'
+        ]
+        
+        months_dict = {
+            'января': 1, 'февраля': 2, 'марта': 3, 'апреля': 4,
+            'мая': 5, 'июня': 6, 'июля': 7, 'августа': 8,
+            'сентября': 9, 'октября': 10, 'ноября': 11, 'декабря': 12
+        }
+        
+        for pattern in date_patterns:
+            match = re.search(pattern, text)  # Используем исходный текст, а не time_str
+            if match:
+                try:
+                    if 'января' in pattern or 'февраля' in pattern:  # Месяц словом
+                        day = int(match.group(1))
+                        month = months_dict[match.group(2)]
+                        year = now.year
+                        
+                        # Если дата уже прошла в этом году, берем следующий год
+                        target_date = datetime(year, month, day)
+                        if target_date.date() < now.date():
+                            target_date = datetime(year + 1, month, day)
+                        
+                        # Извлекаем время если есть
+                        time_match = re.search(r'в\s*(\d{1,2}(?::\d{2})?\s*(?:am|pm|утра|вечера|дня|ночи)?)', text)
+                        if time_match:
+                            time_part = time_match.group(1)
+                            if user:
+                                utc_offset = int(user.timezone[1:])
+                            else:
+                                utc_offset = 3
+                            offset = timedelta(hours=utc_offset)
+                            custom_timezone = timezone.get_fixed_timezone(offset=offset)
+                            parsed_time = dateparser.parse(time_part, settings={
+                                'PREFER_DATES_FROM': 'future',
+                                'TIMEZONE': str(custom_timezone),
+                                'RETURN_AS_TIMEZONE_AWARE': False,
+                            })
+                            if parsed_time:
+                                target_date = target_date.replace(
+                                    hour=parsed_time.hour,
+                                    minute=parsed_time.minute,
+                                    second=0,
+                                    microsecond=0
+                                )
+                            else:
+                                # Если не удалось распарсить время, устанавливаем 9:00
+                                target_date = target_date.replace(hour=9, minute=0, second=0, microsecond=0)
+                        else:
+                            # Если время не указано, устанавливаем на 9:00
+                            target_date = target_date.replace(hour=9, minute=0, second=0, microsecond=0)
+                        
+                        reminder_time = target_date
+                        break
+                    
+                    else:  # Числовой формат
+                        day = int(match.group(1))
+                        month = int(match.group(2))
+                        year = int(match.group(3)) if match.group(3) else now.year
+                        
+                        # Если год двузначный, делаем его четырехзначным
+                        if year < 100:
+                            year += 2000
+                        
+                        target_date = datetime(year, month, day)
+                        
+                        # Извлекаем время если есть
+                        time_match = re.search(r'в\s*(\d{1,2}(?::\d{2})?\s*(?:am|pm|утра|вечера|дня|ночи)?)', text)
+                        if time_match:
+                            time_part = time_match.group(1)
+                            if user:
+                                utc_offset = int(user.timezone[1:])
+                            else:
+                                utc_offset = 3
+                            offset = timedelta(hours=utc_offset)
+                            custom_timezone = timezone.get_fixed_timezone(offset=offset)
+                            parsed_time = dateparser.parse(time_part, settings={
+                                'PREFER_DATES_FROM': 'future',
+                                'TIMEZONE': str(custom_timezone),
+                                'RETURN_AS_TIMEZONE_AWARE': False,
+                            })
+                            if parsed_time:
+                                target_date = target_date.replace(
+                                    hour=parsed_time.hour,
+                                    minute=parsed_time.minute,
+                                    second=0,
+                                    microsecond=0
+                                )
+                            else:
+                                # Если не удалось распарсить время, устанавливаем 9:00
+                                target_date = target_date.replace(hour=9, minute=0, second=0, microsecond=0)
+                        else:
+                            # Если время не указано, устанавливаем на 9:00
+                            target_date = target_date.replace(hour=9, minute=0, second=0, microsecond=0)
+                        
+                        reminder_time = target_date
+                        break
+                        
+                except (ValueError, KeyError):
+                    continue
+    
     # Обычный парсинг времени (только если время еще не установлено)
     if not reminder_time:
-        
         if user:
             utc_offset = int(user.timezone[1:])
         else:
@@ -416,7 +534,6 @@ def parse_reminder_time(text: str, user) -> tuple[datetime, datetime, str, str]:
             'DATE_ORDER': 'DMY'
         }
         reminder_time = timezone.make_aware(dateparser.parse(time_str, settings=settings), timezone=custom_timezone)
-        print(dateparser)
         if reminder_time and reminder_time < now:
             reminder_time += timedelta(days=1)
     
@@ -450,7 +567,10 @@ def parse_reminder_time(text: str, user) -> tuple[datetime, datetime, str, str]:
     custom_timezone = timezone.get_fixed_timezone(offset=offset)
     # Создаем время для предварительного напоминания (за 15 минут)
     pre_reminder_time = reminder_time - timedelta(minutes=15)
-    return timezone.make_naive(reminder_time, timezone=custom_timezone), timezone.make_naive(pre_reminder_time, timezone=custom_timezone), reminder_text, repeat_type
+    try:
+        return timezone.make_aware(reminder_time, timezone=custom_timezone), timezone.make_aware(pre_reminder_time, timezone=custom_timezone), reminder_text, repeat_type
+    except:
+        return timezone.make_aware(timezone.make_naive(reminder_time), timezone=custom_timezone), timezone.make_aware(timezone.make_naive(pre_reminder_time), timezone=custom_timezone), reminder_text, repeat_type
 
 def clean_reminder_text(text: str, time_str: str) -> str:
     """
@@ -475,6 +595,16 @@ def clean_reminder_text(text: str, time_str: str) -> str:
     for artifact in time_artifacts:
         # Удаляем если стоит отдельным словом или в начале
         pattern = rf'\b{re.escape(artifact)}\b'
+        cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE).strip()
+    
+    # Удаляем обычные даты (например, "20 августа", "15.01")
+    date_patterns = [
+        r'\d{1,2}\s+(?:января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)',
+        r'\d{1,2}\.\d{1,2}(?:\.\d{2,4})?',
+        r'\d{1,2}/\d{1,2}(?:/\d{2,4})?'
+    ]
+    
+    for pattern in date_patterns:
         cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE).strip()
     
     # Удаляем артефакты после замены (отдельные буквы и короткие слова)
