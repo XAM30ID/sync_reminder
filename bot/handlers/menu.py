@@ -55,6 +55,25 @@ def cmd_setting(message: Message, bot: TeleBot):
     """
         Обработчик команды /setting
     """
+    markup = InlineKeyboardMarkup()
+    markup.row(
+        InlineKeyboardButton(text='🤝 Обращение', callback_data='set.a'), InlineKeyboardButton(text='🗣️ Стиль общения', callback_data='set.s')
+    )
+    markup.add(InlineKeyboardButton(text='🕑 Часовой пояс', callback_data='set.h'))
+    markup.add(InlineKeyboardButton(text='🔄️ Google-календарь', callback_data='set.g'))
+    markup.add(InlineKeyboardButton(text='❌ Отмена', callback_data='set.cancel'))
+    return bot.send_message(
+        chat_id=message.chat.id,
+        text=f"⚙️ Что нужно настроить?",
+        reply_markup=markup,
+        parse_mode="Markdown"
+    ) 
+
+
+def start_addressing(message: Message, bot: TeleBot):
+    """
+        Обработчик команды /setting
+    """
     bot.set_state(message.from_user.id, SettingsStates.addressing, message.chat.id)
     return bot.send_message(
         chat_id=message.chat.id,
@@ -67,6 +86,12 @@ def cmd_setting(message: Message, bot: TeleBot):
 ADDRESSINGS = {
     'ty': 'ты',
     'vy': 'вы',
+}
+
+STYLES = {
+    'business': '💼 Деловой',
+    'friendly': '🤝 Дружелюбный',
+    'neutral': '👥 Нейтральный',
 }
 
 

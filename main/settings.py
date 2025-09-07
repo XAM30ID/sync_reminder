@@ -40,7 +40,7 @@ BOT_NAME = 'Тоби'
 BOT_COMMANDS = [
     BotCommand("start", "⏩ Старт"),
     BotCommand("setting", "⚙️ Настроить общение"),
-    BotCommand("google_calendar", "🔃 Настроить google-календарь"),
+    # BotCommand("google_calendar", "🔃 Настроить google-календарь"),
 ]
 
 REMINDER_CHECK_INTERVAL = 60

@@ -72,53 +72,159 @@ def m_cmd_setting(message: Message):
         print(e)
 
 
-@bot.message_handler(commands=['google_calendar'])
-def m_google_calendar(message: Message):
-    '''
-        Обработчик команды для работы с гугл календарём
-    '''
-    try:
-        start_google(message=message, bot=bot)
-    except Exception as e:
-        print(e)
-
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith('G'))
+@bot.callback_query_handler(func=lambda call: call.data.startswith('set'))
 def m_selected_google_action(call: CallbackQuery):
     '''
         Работа с Гугл календарём
     '''
     data = call.data.split('.')[-1]
+
+    if call.data.startswith('set.a.'):
+        data = call.data.split('.')[-1]
+        print(call.from_user.id)
+        user = UserProfile.objects.get(user_id=call.from_user.id)
+        user.addressing = data
+        user.save()
+        try: 
+            bot.edit_message_text(
+                text=f"Готово! Выбрано обращение на {ADDRESSINGS[data]}",
+                chat_id=call.message.chat.id,
+                message_id=call.message.message_id
+            )
+        except:
+            bot.send_message(
+                chat_id=call.message.chat.id, 
+                text=f'Готово! Выбрано обращение на {ADDRESSINGS[data]}',
+                parse_mode='html'
+                )
+        return
+    
+    if call.data.startswith('set.s.'):
+        data = call.data.split('.')[-1]
+        user = UserProfile.objects.get(user_id=call.from_user.id)
+        user.tone = data
+        user.save()
+        try: 
+            bot.edit_message_text(
+                text=f"Готово! Выбран стиль общения: {STYLES[data]}",
+                chat_id=call.message.chat.id,
+                message_id=call.message.message_id
+            )
+        except:
+            bot.send_message(
+                chat_id=call.message.chat.id, 
+                text=f'Готово! Выбран стиль общения: {STYLES[data]}',
+                parse_mode='html'
+                )
+        return
+    
+
     if data == 'cancel':
         bot.delete_state(user_id=call.from_user.id, chat_id=call.message.chat.id)
         bot.delete_message(message_id=call.message.id, chat_id=call.message.chat.id)
+        bot.delete_state(user_id=call.from_user.id)
         bot.send_message(
             chat_id=call.message.chat.id,
-            text='Работа с Гугл календарём отменена'
+            text='Настройки отменены'
         )
 
-    if data == 'activate' or data == 'diactivate':
-        change_google_using(call=call, bot=bot)
-    
-    if data == 'change_email':
+    if data == 'a':
         bot.delete_message(message_id=call.message.id, chat_id=call.message.chat.id)
         markup = InlineKeyboardMarkup()
-        markup.add(InlineKeyboardButton(text='❌ Отмена', callback_data='G.cancel'))
-        bot.set_state(user_id=call.message.chat.id, state=SettingsStates.google_email, chat_id=call.message.chat.id)
+        markup.row(InlineKeyboardButton(text='На ты', callback_data='set.a.ty'), InlineKeyboardButton(text='На вы', callback_data='set.a.vy'))
+        markup.add(InlineKeyboardButton(text='❌ Отмена', callback_data='set.cancel'))
         return bot.send_message(
             chat_id=call.message.chat.id, 
-            text='Отправьте новый Email',
+            text='🤝 Как мне обращаться?',
             reply_markup=markup,
             parse_mode='html'
             )
-
-    if data == 'delete_email':
+    
+    if data == 's':
         bot.delete_message(message_id=call.message.id, chat_id=call.message.chat.id)
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton(text='💼 Деловой', callback_data='set.s.business'), InlineKeyboardButton(text='🤝 Дружелюбный', callback_data='set.s.friendly'), InlineKeyboardButton(text='👥 Нейтральный', callback_data='set.s.neutral'))
+        markup.add(InlineKeyboardButton(text='❌ Отмена', callback_data='set.cancel'))
         return bot.send_message(
             chat_id=call.message.chat.id, 
-            text=delete_google_email(user=UserProfile.objects.get(user_id=call.message.chat.id), bot=bot),
+            text='👋 Как мне обращаться?',
+            reply_markup=markup,
             parse_mode='html'
             )
+    
+    if data == 'h':
+        bot.delete_message(message_id=call.message.id, chat_id=call.message.chat.id)
+        bot.set_state(call.from_user.id, SettingsStates.change_timezone)
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton(text='❌ Отмена', callback_data='set.cancel'))
+        return bot.send_message(
+            chat_id=call.message.chat.id, 
+            text='Теперь отправьте часовой пояс в формате: +0',
+            reply_markup=markup,
+            parse_mode='html'
+            )
+    
+    if data == 'g':
+        try:
+            try:
+                bot.delete_message(
+                    chat_id=call.message.chat.id,
+                    message_id=call.message.message_id
+                )
+            except:
+                pass
+            start_google(message=call.message, bot=bot, user_id=call.from_user.id)
+        except Exception as e:
+            print(e)
+
+
+# @bot.message_handler(commands=['google_calendar'])
+# def m_google_calendar(message: Message):
+#     '''
+#         Обработчик команды для работы с гугл календарём
+#     '''
+#     try:
+#         start_google(message=message, bot=bot)
+#     except Exception as e:
+#         print(e)
+
+
+# @bot.callback_query_handler(func=lambda call: call.data.startswith('G'))
+# def m_selected_google_action(call: CallbackQuery):
+#     '''
+#         Работа с Гугл календарём
+#     '''
+#     data = call.data.split('.')[-1]
+#     if data == 'cancel':
+#         bot.delete_state(user_id=call.from_user.id, chat_id=call.message.chat.id)
+#         bot.delete_message(message_id=call.message.id, chat_id=call.message.chat.id)
+#         bot.send_message(
+#             chat_id=call.message.chat.id,
+#             text='Работа с Гугл календарём отменена'
+#         )
+
+#     if data == 'activate' or data == 'diactivate':
+#         change_google_using(call=call, bot=bot)
+    
+#     if data == 'change_email':
+#         bot.delete_message(message_id=call.message.id, chat_id=call.message.chat.id)
+#         markup = InlineKeyboardMarkup()
+#         markup.add(InlineKeyboardButton(text='❌ Отмена', callback_data='G.cancel'))
+#         bot.set_state(user_id=call.message.chat.id, state=SettingsStates.google_email, chat_id=call.message.chat.id)
+#         return bot.send_message(
+#             chat_id=call.message.chat.id, 
+#             text='Отправьте новый Email',
+#             reply_markup=markup,
+#             parse_mode='html'
+#             )
+
+#     if data == 'delete_email':
+#         bot.delete_message(message_id=call.message.id, chat_id=call.message.chat.id)
+#         return bot.send_message(
+#             chat_id=call.message.chat.id, 
+#             text=delete_google_email(user=UserProfile.objects.get(user_id=call.message.chat.id), bot=bot),
+#             parse_mode='html'
+#             )
         
     
     
@@ -218,10 +324,49 @@ def m_handle_text(message: Message):
     '''
         Обработка текста
     '''
-    print(bot.get_state(message.from_user.id))
+    
     if bot.get_state(message.from_user.id) == SettingsStates.google_email.name:
         try:
             set_google_email(message=message, bot=bot)
+        except Exception as e:
+            print(e)
+            bot.send_message(chat_id=763283309, text=e)
+
+    elif bot.get_state(message.from_user.id) == SettingsStates.change_timezone.name:
+        try:
+            if message.text.startswith('+') or message.text.startswith('-') and len(message.text) <= 3:
+                bot.delete_state(message.from_user.id, message.chat.id)
+                user = UserProfile.objects.get(user_id=message.from_user.id)
+                user.timezone = message.text
+                try:
+                    bot.delete_message(
+                        chat_id=message.chat.id,
+                        message_id=message.message_id - 1
+                    )
+                except:
+                    pass
+                bot.send_message(
+                    chat_id=message.chat.id,
+                    text=f'Готово! Ваш часовой пояс: {message.text}'
+                )
+                return 
+            else:
+                markup = InlineKeyboardMarkup()
+                markup.add(InlineKeyboardButton(text='❌ Отмена', callback_data='set.cancel'))
+                try:
+                    bot.delete_message(
+                        chat_id=message.chat.id,
+                        message_id=message.message_id - 1
+                    )
+                except:
+                    pass
+                bot.send_message(
+                    chat_id=message.chat.id,
+                    text='Некорректный часовой пояс',
+                    reply_markup=markup
+                )
+                return
+
         except Exception as e:
             print(e)
             bot.send_message(chat_id=763283309, text=e)

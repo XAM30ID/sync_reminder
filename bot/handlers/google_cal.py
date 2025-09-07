@@ -17,13 +17,13 @@ ON_OFF_BUTTONS = {
     True: InlineKeyboardButton(text='📴 Отключить', callback_data='G.diactivate')
 }
 
-def start_google(message: Message, bot: TeleBot):
-    user = UserProfile.objects.get(user_id=message.from_user.id)
+def start_google(message: Message, bot: TeleBot, user_id):
+    user = UserProfile.objects.get(user_id=user_id)
     markup = InlineKeyboardMarkup()
     if user.use_google_calendar:
         if user.google_email is None and user.google_email == '':
             markup.add(InlineKeyboardButton(text='❌ Отмена', callback_data='G.cancel'))
-            bot.set_state(user_id=message.from_user.id, state=SettingsStates.google_email, chat_id=message.chat.id)
+            bot.set_state(user_id=user_id, state=SettingsStates.google_email, chat_id=message.chat.id)
             return bot.send_photo(
                 chat_id=message.chat.id, 
                 photo=open(os.path.join(BASE_DIR, 'images', 'tutorial', 'giving_accept.jpg'), 'rb'),
@@ -39,6 +39,7 @@ def start_google(message: Message, bot: TeleBot):
         markup.add(ON_OFF_BUTTONS[user.use_google_calendar])
         markup.add(InlineKeyboardButton(text='🔁 Сменить Email', callback_data='G.change_email'))
         markup.add(InlineKeyboardButton(text='🗑️ Удалить Email', callback_data='G.delete_email'))
+        markup.add(InlineKeyboardButton(text='❌ Отмена', callback_data='G.cancel'))
         return bot.send_message(
             chat_id=message.chat.id, 
             text='Для работы с Гугл календарём Вы используете аккаунт\n' \
@@ -52,6 +53,7 @@ def start_google(message: Message, bot: TeleBot):
     if not user.google_email is None and not user.google_email == '':
         markup.add(InlineKeyboardButton(text='🔁 Сменить Email', callback_data='G.change_email'))
         markup.add(InlineKeyboardButton(text='🗑️ Удалить Email', callback_data='G.delete_email'))
+        markup.add(InlineKeyboardButton(text='❌ Отмена', callback_data='G.cancel'))
         return bot.send_message(
             chat_id=message.chat.id, 
             text='Для работы с Гугл календарём Вы используете аккаунт\n' \
@@ -62,7 +64,7 @@ def start_google(message: Message, bot: TeleBot):
             )
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton(text='❌ Отмена', callback_data='G.cancel'))
-    bot.set_state(user_id=message.from_user.id, state=SettingsStates.google_email, chat_id=message.chat.id)
+    bot.set_state(user_id=user_id, state=SettingsStates.google_email, chat_id=message.chat.id)
     return bot.send_photo(
         chat_id=message.chat.id, 
         photo=open(os.path.join(BASE_DIR, 'images', 'tutorial', 'giving_accept.jpg'), 'rb'),
