@@ -176,56 +176,6 @@ def m_selected_google_action(call: CallbackQuery):
             start_google(message=call.message, bot=bot, user_id=call.from_user.id)
         except Exception as e:
             print(e)
-
-
-# @bot.message_handler(commands=['google_calendar'])
-# def m_google_calendar(message: Message):
-#     '''
-#         Обработчик команды для работы с гугл календарём
-#     '''
-#     try:
-#         start_google(message=message, bot=bot)
-#     except Exception as e:
-#         print(e)
-
-
-# @bot.callback_query_handler(func=lambda call: call.data.startswith('G'))
-# def m_selected_google_action(call: CallbackQuery):
-#     '''
-#         Работа с Гугл календарём
-#     '''
-#     data = call.data.split('.')[-1]
-#     if data == 'cancel':
-#         bot.delete_state(user_id=call.from_user.id, chat_id=call.message.chat.id)
-#         bot.delete_message(message_id=call.message.id, chat_id=call.message.chat.id)
-#         bot.send_message(
-#             chat_id=call.message.chat.id,
-#             text='Работа с Гугл календарём отменена'
-#         )
-
-#     if data == 'activate' or data == 'diactivate':
-#         change_google_using(call=call, bot=bot)
-    
-#     if data == 'change_email':
-#         bot.delete_message(message_id=call.message.id, chat_id=call.message.chat.id)
-#         markup = InlineKeyboardMarkup()
-#         markup.add(InlineKeyboardButton(text='❌ Отмена', callback_data='G.cancel'))
-#         bot.set_state(user_id=call.message.chat.id, state=SettingsStates.google_email, chat_id=call.message.chat.id)
-#         return bot.send_message(
-#             chat_id=call.message.chat.id, 
-#             text='Отправьте новый Email',
-#             reply_markup=markup,
-#             parse_mode='html'
-#             )
-
-#     if data == 'delete_email':
-#         bot.delete_message(message_id=call.message.id, chat_id=call.message.chat.id)
-#         return bot.send_message(
-#             chat_id=call.message.chat.id, 
-#             text=delete_google_email(user=UserProfile.objects.get(user_id=call.message.chat.id), bot=bot),
-#             parse_mode='html'
-#             )
-        
     
     
 @bot.message_handler(state=SettingsStates.timezone.name)
